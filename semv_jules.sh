@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -x
 #
 # semv-template.sh - Assembly Template for SEMV
 # semv-revision: 2.0.0-dev_1
@@ -583,8 +584,8 @@ do_latest_tag() { local latest; local ret=1; if is_repo; then latest=$(__git_lat
 do_latest_semver() { local latest; local ret=1; if has_semver; then latest=$(__git_latest_semver); if [[ -n "$latest" ]]; then printf "%s\n" "$latest"; ret=0; else error "No semver tags found"; fi; else error "No semver tags found"; fi; return "$ret"; }
 do_change_count() { local tag="${1:-$(do_latest_tag)}"; local break_count; local feat_count; local fix_count; local dev_count; local ret=1; if [[ -z "$tag" ]]; then error "No tag specified and no tags found"; return 1; fi; b_major=0; b_minor=0; b_patch=0; break_count=$(since_last "$tag" "$SEMV_MAJ_LABEL"); feat_count=$(since_last "$tag" "$SEMV_FEAT_LABEL"); fix_count=$(since_last "$tag" "$SEMV_FIX_LABEL"); dev_count=$(since_last "$tag" "$SEMV_DEV_LABEL"); build_s=$(__git_build_count); note_s="$dev_count"; trace "Changes since $tag: brk=$break_count feat=$feat_count fix=$fix_count dev=$dev_count"; if [[ "$break_count" -ne 0 ]]; then trace "Found breaking changes - major bump"; b_major=1; b_minor=0; b_patch=0; ret=0; elif [[ "$feat_count" -ne 0 ]]; then trace "Found new features - minor bump"; b_minor=1; b_patch=0; ret=0; elif [[ "$fix_count" -ne 0 ]]; then trace "Found bug fixes - patch bump"; b_patch=1; ret=0; elif [[ "$dev_count" -ne 0 ]]; then trace "Found dev notes - no version bump"; ret=0; fi; return "$ret"; }
 do_next_semver() { local force="${1:-1}"; local tag; local parts; local major; local minor; local patch; local extra; local new_version; local tail_suffix=""; local ret=1; tag=$(do_latest_tag); if [[ -z "$tag" ]]; then error "No tags found to bump from"; return 1; fi; parts=$(split_vers "$tag"); if [[ $? -ne 0 ]]; then error "Invalid version format: $tag"; return 1; fi; local -a components=($parts); major="${components[0]}"; minor="${components[1]}"; patch="${components[2]}"; extra="${components[3]}"; if ! do_change_count "$tag"; then if [[ "$opt_dev_note" -eq 0 ]]; then error "No changes since last tag ($tag)"; return 1; fi; fi; major=$((major + b_major)); minor=$((minor + b_minor)); patch=$((patch + b_patch)); if [[ "$b_major" -eq 1 ]]; then minor=0; patch=0; elif [[ "$b_minor" -eq 1 ]]; then patch=0; fi; new_version="v${major}.${minor}.${patch}"; if [[ "$opt_dev_note" -eq 0 ]]; then if [[ "$note_s" -ne 0 ]]; then trace "Dev notes found - adding dev suffix"; tail_suffix="-dev_${note_s}"; else trace "Clean build - adding build suffix"; tail_suffix="-build_${build_s}"; fi; new_version="${new_version}${tail_suffix}"; fi; trace "Version calculation: $tag -> $new_version"; if [[ "$force" -ne 0 ]] && [[ "$note_s" -ne 0 ]] && [[ "$opt_dev_note" -eq 1 ]]; then warn "There are [$note_s] dev notes and --dev flag is disabled"; info "Current: $tag"; info "Next: $new_version"; warn "You should only bump versions if dev notes are resolved"; if ! __confirm "Continue with version bump"; then error "Version bump cancelled"; return 1; fi; fi; printf "%s\n" "$new_version"; ret=0; return "$ret"; }
-do_build_file() { local filename="${1:-build.inf}"; local dest; local ret=1; if [[ "$opt_no_cursor" -eq 0 ]]; then trace "Build cursor disabled - skipping file generation"; return 0; fi; if [[ "$opt_build_dir" -eq 0 ]]; then if [[ ! -d "./build" ]]; then mkdir -p "./build"; fi; dest="./build/${filename}"; else dest="./${filename}"; fi; if __print_build_info "$dest"; then okay "Build file generated: $dest"; if [[ "$opt_trace" -eq 0 ]]; then cat "$dest"; fi; ret=0; else error "Failed to generate build file"; fi; return "$ret"; }
-__print_build_info() { local dest="$1"; local version; local build; local branch; local semver; local ret=1; if [[ -z "$dest" ]]; then return 1; fi; version=$(do_latest_tag); build=$(__git_build_count); branch=$(this_branch); semver=$(do_next_semver 0 2>/dev/null || echo "$version"); cat > "$dest" << EOF
+do_build_file() { local filename="${1:-build.inf}"; local dest; local ret=1; if [[ "$opt_no_cursor" -eq 0 ]]; then trace "Build cursor disabled - skipping file generation"; return 0; fi; if [[ "$opt_build_dir" -eq 0 ]]; then if [[ ! -d "./build" ]]; then mkdir -p "./build"; fi; dest="./build/${filename}"; else dest="./${filename}"; fi; if __print_build_info "$dest" "$(do_latest_tag)"; then okay "Build file generated: $dest"; if [[ "$opt_trace" -eq 0 ]]; then cat "$dest"; fi; ret=0; else error "Failed to generate build file"; fi; return "$ret"; }
+__print_build_info() { local dest="$1"; local version="$2"; local build; local branch; local semver; local ret=1; if [[ -z "$dest" ]]; then return 1; fi; build=$(__git_build_count); branch=$(this_branch); semver="$version"; cat > "$dest" << EOF
 DEV_VERS=${version}
 DEV_BUILD=${build}
 DEV_BRANCH=${branch}
@@ -874,7 +875,7 @@ do_auto() { local path="$1"; local cmd="$2"; error "Auto mode not implemented ye
 # Sync and Workflow Commands
 #-------------------------------------------------------------------------------
 # From parts/semv_sync_detect.sh
-_detect_project_type() { local -a detected_types=(); local ret=1; if [[ -f "Cargo.toml" ]]; then detected_types+=("rust"); trace "Detected Rust project (Cargo.toml found)"; ret=0; fi; if [[ -f "package.json" ]]; then detected_types+=("js"); trace "Detected JavaScript project (package.json found)"; ret=0; fi; if [[ -f "pyproject.toml" ]]; then detected_types+=("python"); trace "Detected Python project (pyproject.toml found)"; ret=0; fi; if _detect_bash_project; then detected_types+=("bash"); trace "Detected Bash project (script with version meta found)"; ret=0; fi; PROJECT_TYPES=("${detected_types[@]}"); if [[ "${#detected_types[@]}" -gt 0 ]]; then printf "%s\n" "${detected_types[*]}"; fi; return "$ret"; }
+_detect_project_type() { local -a detected_types=(); local ret=1; if [[ -f "Cargo.toml" ]]; then detected_types+=("rust"); trace "Detected Rust project (Cargo.toml found)"; ret=0; fi; if [[ -f "package.json" ]]; then detected_types+=("js"); trace "Detected JavaScript project (package.json found)"; ret=0; fi; if [[ -f "pyproject.toml" ]]; then detected_types+=("python"); trace "Detected Python project (pyproject.toml found)"; ret=0; fi; if _detect_bash_project; then detected_types+=("bash"); trace "Detected Bash project (script with version meta found)"; ret=0; fi; PROJECT_TYPES=("${detected_types[@]}"); if [[ "${#detected_types[@]}" -gt 0 ]]; then printf "%s\n" "${detected_types[@]}"; fi; return "$ret"; }
 _detect_bash_project() { local -a script_files; local file; mapfile -t script_files < <(find . -maxdepth 2 -name "*.sh" -executable 2>/dev/null); for file in "${script_files[@]}"; do if [[ -f "$file" ]] && grep -q "^# version:" "$file" 2>/dev/null; then trace "Found bash script with version meta: $file"; return 0; fi; done; return 1; }
 _validate_project_structure() { local -a rust_files; local -a js_files; local -a python_files; local ret=0; mapfile -t rust_files < <(find . -maxdepth 1 -name "Cargo.toml" 2>/dev/null); if [[ "${#rust_files[@]}" -gt 1 ]]; then error "Multiple Cargo.toml files found in root directory"; ret=1; fi; mapfile -t js_files < <(find . -maxdepth 1 -name "package.json" 2>/dev/null); if [[ "${#js_files[@]}" -gt 1 ]]; then error "Multiple package.json files found in root directory"; ret=1; fi; mapfile -t python_files < <(find . -maxdepth 1 -name "pyproject.toml" 2>/dev/null); if [[ "${#python_files[@]}" -gt 1 ]]; then error "Multiple pyproject.toml files found in root directory"; ret=1; fi; if [[ "$ret" -eq 1 ]]; then error "Project structure has conflicts - cannot determine single version source"; fi; return "$ret"; }
 _get_project_version() { local project_type="$1"; local version; local ret=1; if [[ -z "$project_type" ]]; then error "Project type required"; return 1; fi; case "$project_type" in rust) version=$(__parse_cargo_version); ret=$?; ;; js) version=$(__parse_package_version); ret=$?; ;; python) version=$(__parse_pyproject_version); ret=$?; ;; bash) version=$(__parse_bash_version); ret=$?; ;; *) error "Unsupported project type: $project_type"; return 1; ;; esac; if [[ "$ret" -eq 0 ]] && [[ -n "$version" ]]; then printf "%s\n" "$version"; else error "Failed to extract version from $project_type project"; fi; return "$ret"; }
@@ -896,10 +897,71 @@ __write_pyproject_version() { local new_version="$1"; local pyproject_file="pypr
 __parse_bash_version() { local -a script_files; local file; local version; local ret=1; mapfile -t script_files < <(find . -maxdepth 2 -name "*.sh" -executable 2>/dev/null); for file in "${script_files[@]}"; do if [[ -f "$file" ]]; then version=$(grep "^# version:" "$file" 2>/dev/null | head -1 | sed 's/^# version:[[:space:]]*//' | tr -d ' '); if [[ -n "$version" ]]; then printf "%s\n" "$version"; ret=0; break; fi; fi; done; if [[ "$ret" -ne 0 ]]; then error "No bash script with version metadata found"; fi; return "$ret"; }
 __write_bash_version() { local new_version="$1"; local -a script_files; local file; local backup_file; local ret=1; if [[ -z "$new_version" ]]; then error "Version required"; return 1; fi; mapfile -t script_files < <(find . -maxdepth 2 -name "*.sh" -executable 2>/dev/null); for file in "${script_files[@]}"; do if [[ -f "$file" ]] && grep -q "^# version:" "$file" 2>/dev/null; then backup_file="${file}.semv-backup"; if ! cp "$file" "$backup_file"; then error "Failed to create backup of $file"; continue; fi; if sed -i.tmp "s/^# version:.*/# version: $new_version/" "$file"; then trace "Updated $file version to $new_version"; rm -f "${file}.tmp" "$backup_file"; ret=0; break; else error "Failed to update $file"; mv "$backup_file" "$file"; fi; fi; done; if [[ "$ret" -ne 0 ]]; then error "No bash script with version metadata found to update"; fi; return "$ret"; }
 __parse_cursor_version() { local cursor_file=".build"; local version; local ret=1; if [[ -f "$cursor_file" ]]; then :; elif [[ -f "build/build.inf" ]]; then cursor_file="build/build.inf"; elif [[ -f "build.inf" ]]; then cursor_file="build.inf"; else trace "No build cursor file found"; return 1; fi; version=$(grep "^DEV_SEMVER=" "$cursor_file" 2>/dev/null | head -1 | cut -d'=' -f2); if [[ -z "$version" ]]; then version=$(grep "^DEV_VERS=" "$cursor_file" 2>/dev/null | head -1 | cut -d'=' -f2); fi; if [[ -n "$version" ]]; then printf "%s\n" "$version"; ret=0; else error "Failed to parse version from cursor file: $cursor_file"; fi; return "$ret"; }
-__write_cursor_version() { local new_version="$1"; local cursor_file=".build"; local backup_file; local ret=1; if [[ -z "$new_version" ]]; then error "Version required"; return 1; fi; if [[ -f "$cursor_file" ]]; then :; elif [[ -f "build/build.inf" ]]; then cursor_file="build/build.inf"; elif [[ -f "build.inf" ]]; then cursor_file="build.inf"; else trace "Creating new build cursor file: $cursor_file"; if ! __print_build_info "$cursor_file"; then error "Failed to create build cursor file"; return 1; fi; ret=0; fi; if [[ "$ret" -ne 0 ]] && [[ -f "$cursor_file" ]]; then backup_file="${cursor_file}.semv-backup"; if ! cp "$cursor_file" "$backup_file"; then error "Failed to create backup of $cursor_file"; return 1; fi; sed -i.tmp -e "s/^DEV_SEMVER=.*/DEV_SEMVER=$new_version/" -e "s/^DEV_VERS=.*/DEV_VERS=$new_version/" "$cursor_file"; if [[ $? -eq 0 ]]; then trace "Updated $cursor_file version to $new_version"; rm -f "${cursor_file}.tmp" "$backup_file"; ret=0; else error "Failed to update $cursor_file"; mv "$backup_file" "$cursor_file"; fi; fi; return "$ret"; }
+__write_cursor_version() { local new_version="$1"; local cursor_file=".build"; local backup_file; local ret=1; if [[ -z "$new_version" ]]; then error "Version required"; return 1; fi; if [[ -f "$cursor_file" ]]; then :; elif [[ -f "build/build.inf" ]]; then cursor_file="build/build.inf"; elif [[ -f "build.inf" ]]; then cursor_file="build.inf"; else trace "Creating new build cursor file: $cursor_file"; if ! __print_build_info "$cursor_file" "$new_version"; then error "Failed to create build cursor file"; return 1; fi; ret=0; fi; if [[ "$ret" -ne 0 ]] && [[ -f "$cursor_file" ]]; then backup_file="${cursor_file}.semv-backup"; if ! cp "$cursor_file" "$backup_file"; then error "Failed to create backup of $cursor_file"; return 1; fi; sed -i.tmp -e "s/^DEV_SEMVER=.*/DEV_SEMVER=$new_version/" -e "s/^DEV_VERS=.*/DEV_VERS=$new_version/" "$cursor_file"; if [[ $? -eq 0 ]]; then trace "Updated $cursor_file version to $new_version"; rm -f "${cursor_file}.tmp" "$backup_file"; ret=0; else error "Failed to update $cursor_file"; mv "$backup_file" "$cursor_file"; fi; fi; return "$ret"; }
 
 # From parts/semv_sync_commands.sh
-do_sync() { local project_type="$1"; local -a detected_types; local -a all_versions; local highest_version; local ret=1; if ! is_repo; then error "Not in a git repository"; return 1; fi; info "Starting version synchronization..."; if ! _validate_project_structure; then return 1; fi; if [[ -n "$project_type" ]]; then detected_types=("$project_type"); info "Syncing specific project type: $project_type"; else mapfile -t detected_types < <(_detect_project_type); if [[ "${#detected_types[@]}" -eq 0 ]]; then error "No supported project types detected"; return 1; fi; info "Detected project types: ${detected_types[*]}"; fi; if ! _gather_all_versions all_versions "${detected_types[@]}"; then error "Failed to gather version information"; return 1; fi; highest_version=$(_find_highest_version "${all_versions[@]}"); if [[ -z "$highest_version" ]]; then error "No valid versions found"; return 1; fi; info "Highest version found: $highest_version"; if _sync_all_sources "$highest_version" "${detected_types[@]}"; then okay "Version synchronization completed successfully"; info "All sources synced to: $highest_version"; _update_cursor_sync_info "$highest_version" "${detected_types[0]}"; ret=0; else error "Failed to synchronize all sources"; fi; return "$ret"; }
+do_sync() {
+    local project_type="$1";
+    local -a detected_types;
+    local -a all_versions;
+    local highest_version;
+    local ret=0; # Default to success
+
+    if ! is_repo; then error "Not in a git repository"; return 1; fi
+    info "Starting version synchronization..."
+    if ! _validate_project_structure; then return 1; fi
+
+    if [[ -n "$project_type" ]]; then
+        detected_types=("$project_type")
+        info "Syncing specific project type: $project_type"
+    else
+        mapfile -t detected_types < <(_detect_project_type)
+        if [[ "${#detected_types[@]}" -eq 0 ]]; then
+            error "No supported project types detected"
+            return 1
+        fi
+        info "Detected project types: ${detected_types[*]}"
+    fi
+
+    if ! _gather_all_versions all_versions "${detected_types[@]}"; then
+        error "Failed to gather version information"
+        return 1
+    fi
+
+    highest_version=$(_find_highest_version "${all_versions[@]}")
+    if [[ -z "$highest_version" ]]; then
+        error "No valid versions found"
+        return 1
+    fi
+    info "Highest version found: $highest_version"
+
+    if _sync_all_sources "$highest_version" "${detected_types[@]}"; then
+        local latest_git_tag
+        latest_git_tag=$(do_latest_tag 2>/dev/null || echo "")
+
+        # If there's no git tag, or if the highest version is greater, create a tag
+        if [[ -z "$latest_git_tag" ]] || do_is_greater "$highest_version" "$latest_git_tag"; then
+            info "Sync resulted in a new highest version: $highest_version. Tagging..."
+            if __git_tag_create "$highest_version" "sync: auto-tagging from source file"; then
+                okay "Created new git tag: $highest_version"
+            else
+                error "Failed to create git tag during sync"
+                ret=1 # Sync fails if tagging fails
+            fi
+        fi
+
+        if [[ "$ret" -eq 0 ]]; then
+            okay "Version synchronization completed successfully"
+            info "All sources synced to: $highest_version"
+            _update_cursor_sync_info "$highest_version" "${detected_types[0]}"
+        fi
+    else
+        error "Failed to synchronize all sources"
+        ret=1
+    fi
+
+    return "$ret"
+}
 do_validate() { local -a detected_types; local -a all_versions; local -a unique_versions; local ret=1; if ! is_repo; then error "Not in a git repository"; return 1; fi; info "Validating version synchronization..."; mapfile -t detected_types < <(_detect_project_type); if [[ "${#detected_types[@]}" -eq 0 ]]; then warn "No supported project types detected"; return 0; fi; if ! _gather_all_versions all_versions "${detected_types[@]}"; then error "Failed to gather version information"; return 1; fi; mapfile -t unique_versions < <(printf "%s\n" "${all_versions[@]}" | sort -u); if [[ "${#unique_versions[@]}" -eq 1 ]]; then okay "All sources are in sync: ${unique_versions[0]}"; ret=0; else warn "Version drift detected:"; _show_version_drift "${detected_types[@]}"; ret=1; fi; return "$ret"; }
 do_drift() { local -a detected_types; if ! is_repo; then error "Not in a git repository"; return 1; fi; info "Checking for version drift..."; mapfile -t detected_types < <(_detect_project_type); if [[ "${#detected_types[@]}" -eq 0 ]]; then warn "No supported project types detected"; return 0; fi; _show_version_drift "${detected_types[@]}"; return 0; }
 _gather_all_versions() { local -n versions_ref="$1"; shift; local project_type; local version; local git_version; local cursor_version; versions_ref=(); git_version=$(do_latest_tag 2>/dev/null); if [[ -n "$git_version" ]] && is_valid_semver "$git_version"; then versions_ref+=("$git_version"); trace "Git version: $git_version"; fi; cursor_version=$(__parse_cursor_version 2>/dev/null); if [[ -n "$cursor_version" ]] && is_valid_semver "$cursor_version"; then versions_ref+=("$cursor_version"); trace "Cursor version: $cursor_version"; fi; for project_type in "$@"; do version=$(_get_project_version "$project_type" 2>/dev/null); if [[ -n "$version" ]] && is_valid_semver "$version"; then if [[ ! "$version" =~ ^v ]]; then version="v$version"; fi; versions_ref+=("$version"); trace "$project_type version: $version"; else warn "Failed to get valid version from $project_type source"; fi; done; if [[ "${#versions_ref[@]}" -eq 0 ]]; then return 1; fi; return 0; }

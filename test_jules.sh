@@ -3,6 +3,16 @@
 # test.sh - A test runner for the semv script
 # This script creates a temporary git repository to test semv's functionality.
 
+# --- Git Simulator Hook ---
+# Override the 'git' command to use our simulator.
+# This ensures all git operations are sandboxed and don't affect the real environment.
+git() {
+    # The simulator script is copied into the test directory,
+    # so we can call it directly.
+    ./git_simulator.sh "$@"
+}
+export -f git
+
 # --- Configuration and Helpers ---
 
 # Colors for output
@@ -69,15 +79,17 @@ setup() {
     rm -rf "$TEST_REPO_DIR"
     mkdir -p "$TEST_REPO_DIR"
     
-    # Copy semv script
-    if [[ ! -f "semv" ]]; then
-        echo "${fail_glyph} 'semv' script not found. Cannot run tests."
+    # Copy semv and simulator scripts
+    if [[ ! -f "semv_jules.sh" ]] || [[ ! -f "git_simulator.sh" ]]; then
+        echo "${fail_glyph} 'semv_jules.sh' or 'git_simulator.sh' script not found. Cannot run tests."
         exit 1
     fi
-    cp semv "$TEST_REPO_DIR/"
+    cp semv_jules.sh "$TEST_REPO_DIR/semv"
+    cp git_simulator.sh "$TEST_REPO_DIR/"
     
     cd "$TEST_REPO_DIR" || exit 1
     chmod +x semv
+    chmod +x git_simulator.sh
     
     # Configure git
     git init > /dev/null
