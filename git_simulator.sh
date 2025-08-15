@@ -9,7 +9,7 @@ STATE_FILE_TAGS="$SIM_DIR/tags.txt"
 STATE_FILE_COMMITS="$SIM_DIR/commits.txt"
 STATE_FILE_BRANCH="$SIM_DIR/branch.txt"
 STATE_FILE_HEAD="$SIM_DIR/HEAD"
-STATE_FILE_STAGED="$SIM_DIR/staged.txt"
+STATE_FILE_INDEX="$SIM_DIR/index"
 
 # --- Helper Functions ---
 is_repo() {
@@ -27,7 +27,7 @@ cmd_init() {
         touch "$STATE_FILE_TAGS"
         touch "$STATE_FILE_COMMITS"
         touch "$STATE_FILE_CONFIG"
-        touch "$STATE_FILE_STAGED"
+        touch "$STATE_FILE_INDEX"
         echo "main" > "$STATE_FILE_BRANCH"
         # HEAD will store the last commit hash, or be empty
         touch "$STATE_FILE_HEAD"
@@ -52,8 +52,18 @@ cmd_config() {
 
 # git add
 cmd_add() {
-    # Simulate adding all files to staging
-    find . -type f > "$STATE_FILE_STAGED"
+    # Add specified files to the index.
+    # A dot '.' means add everything in the current directory.
+    if [[ "$1" == "." ]] || [[ "$1" == "--all" ]]; then
+        # Find all files except those in .gitsim
+        find . -type f -not -path "./.gitsim/*" >> "$STATE_FILE_INDEX"
+    else
+        for file in "$@"; do
+            echo "$file" >> "$STATE_FILE_INDEX"
+        done
+    fi
+    # Ensure uniqueness
+    sort -u "$STATE_FILE_INDEX" -o "$STATE_FILE_INDEX"
     return 0
 }
 
@@ -82,8 +92,8 @@ cmd_commit() {
     commit_hash=$(date +%s | shasum | head -c 7)
     echo "$commit_hash $message" >> "$STATE_FILE_COMMITS"
     echo "$commit_hash" > "$STATE_FILE_HEAD"
-    # Clear staged files after commit
-    > "$STATE_FILE_STAGED"
+    # Clear the index after commit
+    > "$STATE_FILE_INDEX"
     return 0
 }
 
@@ -232,8 +242,10 @@ cmd_rev_list() {
 # git status
 cmd_status() {
     if [[ "$1" == "--porcelain" ]]; then
-        # Return staged files
-        cat "$STATE_FILE_STAGED" | sed 's/^/A  /'
+        # Return staged files from the index
+        if [ -s "$STATE_FILE_INDEX" ]; then
+            sed 's/^/A  /' "$STATE_FILE_INDEX"
+        fi
         return 0
     fi
     return 1
@@ -247,14 +259,16 @@ cmd_fetch() {
 
 # git diff
 cmd_diff() {
-    # Pretend no diff if no files are staged
-    if [ ! -s "$STATE_FILE_STAGED" ]; then
-        return 0 # success, no diff
-    else
-        # there are staged files, so there is a diff
-        echo "diff --git a/file b/file"
-        return 1 # failure, diff found
+    # Check for staged changes.
+    if [[ "$1" == "--exit-code" ]]; then
+        if [ -s "$STATE_FILE_INDEX" ]; then
+            return 1 # 1 means there are differences
+        else
+            return 0 # 0 means no differences
+        fi
     fi
+    # Default diff behavior (not implemented)
+    return 0
 }
 
 # git push

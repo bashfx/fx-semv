@@ -161,6 +161,22 @@ main() {
     run_test "Cargo.toml should be updated to 0.2.0" "grep -q 'version = \"0.2.0\"' Cargo.toml"
     run_test "package.json should be updated to 0.2.0" "grep -q '\"version\": \"0.2.0\"' package.json"
 
+    # --- New test for dirty state handling ---
+    run_test "dirty: create a new file to make the repo dirty" "echo 'dirty file' > dirty.txt"
+    run_test "dirty: stage the new file" "git add dirty.txt"
+
+    # Get commit count before bump
+    commit_count_before=$(./git_simulator.sh log | wc -l)
+
+    # Run bump with -y, which should auto-commit the dirty file
+    run_test "dirty: bump should auto-commit dirty file" "./semv bump -y"
+
+    # Get commit count after bump
+    commit_count_after=$(./git_simulator.sh log | wc -l)
+
+    # Verify a new commit was made
+    run_test "dirty: a new commit should have been created for the dirty file" "[[ $commit_count_after -gt $commit_count_before ]]"
+
     # --- Test Summary ---
     echo ""
     echo "--- Test Suite Summary ---"

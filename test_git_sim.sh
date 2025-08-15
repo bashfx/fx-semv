@@ -105,6 +105,23 @@ main() {
     # Test log
     run_test "sim: log should return commit message" "./git_simulator.sh log | grep -q 'feat: initial commit'"
 
+    # --- New tests for staging ---
+
+    # Create a dummy file to add
+    run_test "sim: create a dummy file for staging" "echo 'hello' > dummy.txt"
+
+    # Test add and status
+    run_test "sim: add should stage the dummy file" "./git_simulator.sh add dummy.txt"
+    run_test "sim: status should show the staged file" "./git_simulator.sh status --porcelain | grep -q 'A  dummy.txt'"
+
+    # Test diff
+    run_test "sim: diff --exit-code should indicate changes" "./git_simulator.sh diff --exit-code" 1
+
+    # Test commit clearing the index
+    run_test "sim: commit should succeed" "./git_simulator.sh commit -m 'feat: add dummy file'"
+    run_test "sim: status should be clean after commit" "! ./git_simulator.sh status --porcelain | grep ."
+    run_test "sim: diff --exit-code should be clean after commit" "./git_simulator.sh diff --exit-code" 0
+
     # --- Test Summary ---
     echo ""
     echo "--- Simulator Test Suite Summary ---"
