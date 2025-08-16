@@ -99,49 +99,56 @@ main() {
 
     # NOTE: CWD is now inside .gitsim
 
-    # Test config
+    # --- Test Core Functionality ---
     run_test "sim: config set user.name" "../git_sim.sh config user.name 'Test Sim User'"
     run_test "sim: config get user.name" "[[ \"$(../git_sim.sh config user.name)\" == 'Test Sim User' ]]"
 
-    # Test commit
-    run_test "sim: commit should create a commit" "../git_sim.sh commit -m 'feat: initial commit'"
-    run_test "sim: commits.txt should have 1 line" "[[ $(cat ./.data/commits.txt | wc -l) -eq 1 ]]"
+    # --- Test Tagging ---
+    run_test "tag: creating a tag with no commit should fail" "! ../git_sim.sh tag -a v0.0.1 -m 'fail'"
 
-    # Test tag
-    run_test "sim: tag should create a tag" "../git_sim.sh tag -a v0.1.0 -m 'first tag'"
-    run_test "sim: tags.txt should contain v0.1.0" "grep -q v0.1.0 ./.data/tags.txt"
+    run_test "tag: make a first commit" "../git_sim.sh commit -m 'feat: first'"
+    run_test "tag: create first tag" "../git_sim.sh tag -a v0.1.0 -m 'first tag'"
+    run_test "tag: describe should show v0.1.0" "[[ $(../git_sim.sh describe) == 'v0.1.0' ]]"
 
-    # Test describe
-    run_test "sim: describe should return latest tag" "[[ $(../git_sim.sh describe) == 'v0.1.0' ]]"
+    run_test "tag: make a second commit" "../git_sim.sh commit -m 'feat: second'"
+    run_test "tag: create second tag" "../git_sim.sh tag -a v0.2.0 -m 'second tag'"
+    run_test "tag: describe should show v0.2.0" "[[ $(../git_sim.sh describe) == 'v0.2.0' ]]"
 
-    # Test log
-    run_test "sim: log should return commit message" "../git_sim.sh log | grep -q 'feat: initial commit'"
+    run_test "tag: listing should show both tags" "[[ $(../git_sim.sh tag | wc -l) -eq 2 ]]"
+    run_test "tag: delete a tag" "../git_sim.sh tag -d v0.1.0"
+    run_test "tag: listing should show one tag" "[[ $(../git_sim.sh tag | wc -l) -eq 1 ]]"
+    run_test "tag: describe should now be v0.2.0" "[[ $(../git_sim.sh describe) == 'v0.2.0' ]]"
+
+    # --- Test Log Range ---
+    run_test "log: log since v0.2.0 should be empty" "[[ -z \"$(../git_sim.sh log --pretty=format:%s v0.2.0..HEAD)\" ]]"
+    run_test "log: make another commit" "../git_sim.sh commit -m 'fix: a fix'"
+    run_test "log: log since v0.2.0 should now have one commit" "[[ $(../git_sim.sh log --pretty=format:%s v0.2.0..HEAD | wc -l) -eq 1 ]]"
 
     # --- Tests for staging ---
-    run_test "sim: create a dummy file for staging" "echo 'hello' > dummy.txt"
-    run_test "sim: add should stage the dummy file" "../git_sim.sh add dummy.txt"
-    run_test "sim: status should show the staged file" "../git_sim.sh status --porcelain | grep -q 'A  dummy.txt'"
-    run_test "sim: diff --exit-code should indicate changes" "../git_sim.sh diff --exit-code" 1
-    run_test "sim: commit should succeed" "../git_sim.sh commit -m 'feat: add dummy file'"
-    run_test "sim: status should be clean after commit" "! ../git_sim.sh status --porcelain | grep ."
-    run_test "sim: diff --exit-code should be clean after commit" "../git_sim.sh diff --exit-code" 0
+    run_test "staging: create a dummy file" "echo 'hello' > dummy.txt"
+    run_test "staging: add should stage the dummy file" "../git_sim.sh add dummy.txt"
+    run_test "staging: status should show the staged file" "../git_sim.sh status --porcelain | grep -q 'A  dummy.txt'"
+    run_test "staging: diff --exit-code should indicate changes" "../git_sim.sh diff --exit-code" 1
+    run_test "staging: commit should succeed" "../git_sim.sh commit -m 'feat: add dummy file'"
+    run_test "staging: status should be clean after commit" "! ../git_sim.sh status --porcelain | grep ."
+    run_test "staging: diff --exit-code should be clean after commit" "../git_sim.sh diff --exit-code" 0
 
-    # --- Tests for noise command (enhanced) ---
-    # The noise command is run from the parent of .gitsim
-    run_test "sim: noise command should create 2 files" "cd .. && ./git_sim.sh noise 2 && cd .gitsim"
-    run_test "sim: status should show 2 noisy files" "[[ $(../git_sim.sh status --porcelain | wc -l) -eq 2 ]]"
-    run_test "sim: noisy files should not have default name" "! ../git_sim.sh status --porcelain | grep -q 'noise_file_'"
-
-    # --- New test for human-readable status ---
-    run_test "sim: status without porcelain should be human-readable" "../git_sim.sh status | grep -q 'Changes to be committed:'"
-    run_test "sim: commit noisy files" "../git_sim.sh commit -m 'feat: add noisy files'"
-    run_test "sim: status should be clean after noisy commit" "! ../git_sim.sh status | grep 'new file:'"
+    # --- Tests for noise and status commands ---
+    run_test "noise: noise command should create 2 files" "cd .. && ./git_sim.sh noise 2 && cd .gitsim"
+    run_test "noise: status should show 2 noisy files" "[[ $(../git_sim.sh status --porcelain | wc -l) -eq 2 ]]"
+    run_test "noise: noisy files should not have default name" "! ../git_sim.sh status --porcelain | grep -q 'noise_file_'"
+    run_test "status: status without porcelain should be human-readable" "../git_sim.sh status | grep -q 'Changes to be committed:'"
+    run_test "noise: commit noisy files" "../git_sim.sh commit -m 'feat: add noisy files'"
+    run_test "status: status should be clean after noisy commit" "! ../git_sim.sh status | grep 'new file:'"
 
 
-    # --- Test .gitignore management (from parent dir) ---
+    # --- Test .gitignore and help commands (from parent dir) ---
     cd .. # cd back to sim_test
     run_test "gitignore: .gitignore should exist" "[ -f .gitignore ]"
     run_test "gitignore: .gitignore should contain .gitsim/" "grep -q '^\.gitsim/$' .gitignore"
+    run_test "help: help command should run successfully" "./git_sim.sh help"
+    run_test "help: help output should contain 'usage:'" "./git_sim.sh help | grep -q 'usage:'"
+
 
     # --- Test Summary ---
     echo ""

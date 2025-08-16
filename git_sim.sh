@@ -17,6 +17,32 @@ find_sim_root() {
     return 1
 }
 
+usage() {
+    echo "usage: git_sim.sh <command> [<args>]"
+    echo ""
+    echo "These are common Git commands used in various situations:"
+    echo ""
+    echo "start a working area"
+    echo "   init       Create an empty Git repository or reinitialize an existing one"
+    echo ""
+    echo "work on the current change"
+    echo "   add        Add file contents to the index"
+    echo "   status     Show the working tree status"
+    echo ""
+    echo "examine the history and state"
+    echo "   log        Show commit logs"
+    echo "   describe   Give an object a human readable name based on an available ref"
+    echo "   diff       Show changes between commits, commit and working tree, etc"
+    echo ""
+    echo "grow, mark and tweak your common history"
+    echo "   commit     Record changes to the repository"
+    echo "   tag        Create, list, delete or verify a tag object signed with GPG"
+    echo ""
+    echo "custom simulator commands"
+    echo "   noise      Create random files and stage them"
+    echo "   help       Show this help message"
+}
+
 # --- Subcommands ---
 
 # git init
@@ -83,7 +109,7 @@ cmd_commit() {
     done
     if [ -z "$message" ]; then return 1; fi
     local commit_hash
-    commit_hash=$(date +%s | shasum | head -c 7)
+    commit_hash=$( (echo "$message" ; date +%s) | shasum | head -c 7)
     echo "$commit_hash $message" >> "$STATE_FILE_COMMITS"
     echo "$commit_hash" > "$STATE_FILE_HEAD"
     > "$STATE_FILE_INDEX"
@@ -91,7 +117,9 @@ cmd_commit() {
 }
 
 cmd_tag() {
-    local STATE_FILE_TAGS="$1"; shift
+    local STATE_FILE_TAGS="$1"
+    local STATE_FILE_HEAD="$2"
+    shift 2
     if [[ $# -eq 0 ]]; then cat "$STATE_FILE_TAGS" | cut -d' ' -f1; return 0; fi
     local tag_name=""
     local message=""
@@ -110,13 +138,43 @@ cmd_tag() {
         return 0
     fi
     if [ -n "$tag_name" ]; then
-        echo "$tag_name $message" >> "$STATE_FILE_TAGS"
+        local commit_hash
+        commit_hash=$(cat "$STATE_FILE_HEAD")
+        if [ -z "$commit_hash" ]; then
+            echo "fatal: Failed to create tag: HEAD does not point to a commit" >&2
+            return 128
+        fi
+        echo "$tag_name $commit_hash $message" >> "$STATE_FILE_TAGS"
         return 0
     fi
 }
 
 cmd_log() {
-    local STATE_FILE_COMMITS="$1"; shift
+    local STATE_FILE_COMMITS="$1"
+    local STATE_FILE_TAGS="$2"
+    shift 2
+
+    # git log --pretty=format:"%s" "${tag}"..HEAD
+    # This is a very specific implementation for semv's `since_last`
+    if [[ "$1" == "--pretty=format:%s" ]]; then
+        local range="$2"
+        if [[ "$range" == *"..HEAD"* ]]; then
+            local tag_name
+            tag_name=$(echo "$range" | sed 's/\.\.HEAD//')
+
+            local tag_commit_hash
+            tag_commit_hash=$(grep "^$tag_name " "$STATE_FILE_TAGS" | head -n 1 | cut -d' ' -f2)
+
+            if [ -n "$tag_commit_hash" ]; then
+                # Find all commits after the tagged commit
+                # The `sed` command prints all lines after the line with the matching hash
+                sed -n "/$tag_commit_hash/,\$p" "$STATE_FILE_COMMITS" | tail -n +2 | awk '{$1=""; print $0}' | sed 's/^ //g'
+                return 0
+            fi
+        fi
+    fi
+
+    # Default behavior: print all commit messages
     awk '{$1=""; print $0}' "$STATE_FILE_COMMITS" | sed 's/^ //g'
     return 0
 }
@@ -245,6 +303,12 @@ cmd_noise() {
 
 main() {
     local cmd="$1"
+
+    if [[ -z "$cmd" ]] || [[ "$cmd" == "help" ]] || [[ "$cmd" == "--help" ]]; then
+        usage
+        return 0
+    fi
+
     shift
 
     if [ "$cmd" == "init" ]; then
@@ -272,13 +336,13 @@ main() {
         config)         cmd_config "$STATE_FILE_CONFIG" "$@";;
         add)            cmd_add "$STATE_FILE_INDEX" "$@";;
         commit)         cmd_commit "$STATE_FILE_COMMITS" "$STATE_FILE_HEAD" "$STATE_FILE_INDEX" "$@";;
-        tag)            cmd_tag "$STATE_FILE_TAGS" "$@";;
-        log)            cmd_log "$STATE_FILE_COMMITS" "$@";;
+        tag)            cmd_tag "$STATE_FILE_TAGS" "$STATE_FILE_HEAD" "$@";;
+        log)            cmd_log "$STATE_FILE_COMMITS" "$STATE_FILE_TAGS" "$@";;
         describe)       cmd_describe "$STATE_FILE_TAGS" "$@";;
         rev-parse)      cmd_rev_parse "$STATE_FILE_HEAD" "$@";;
         branch)         cmd_branch "$STATE_FILE_BRANCH" "$@";;
-        symbolic-ref)   cmd_symbolic_ref "$@" "$@";;
-        show)           cmd_show "$@" "$@";;
+        symbolic-ref)   cmd_symbolic_ref "$@";;
+        show)           cmd_show "$@";;
         show-ref)       cmd_show_ref "$STATE_FILE_TAGS" "$@";;
         rev-list)       cmd_rev_list "$STATE_FILE_COMMITS" "$@";;
         status)         cmd_status "$STATE_FILE_INDEX" "$@";;
@@ -288,6 +352,7 @@ main() {
         noise)          cmd_noise "$SIM_DIR" "$DATA_DIR" "$@";;
         *)
             echo "git_simulator: unknown command '$cmd'" >&2
+            usage
             return 1
             ;;
     esac
