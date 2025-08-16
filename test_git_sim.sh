@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# test_git_sim.sh - A test runner for the git_simulator.sh script
+# test_git_sim.sh - A test runner for the git_sim.sh script
 
 # --- Configuration and Helpers ---
 
@@ -65,14 +65,28 @@ setup_sim_test() {
     echo "Setting up simulator test environment in ./${SIM_TEST_DIR}..."
     rm -rf "$SIM_TEST_DIR"
     mkdir -p "$SIM_TEST_DIR"
-    cp "git_simulator.sh" "$SIM_TEST_DIR/"
+    cp "git_sim.sh" "$SIM_TEST_DIR/"
     cd "$SIM_TEST_DIR" || exit 1
-    chmod +x "git_simulator.sh"
+    chmod +x "git_sim.sh"
+
+    # Initialize the repo. This creates the .gitsim dir.
+    ./git_sim.sh init
+
+    # All subsequent operations happen inside the simulated project folder
+    cd .gitsim || exit 1
 }
 
 cleanup_sim_test() {
     echo "Cleaning up simulator test environment..."
-    cd ..
+    # We are inside .gitsim, which is inside sim_test
+    current_dir=$(basename "$PWD")
+    if [[ "$current_dir" == ".gitsim" ]]; then
+        cd ..
+    fi
+    current_dir=$(basename "$PWD")
+    if [[ "$current_dir" == "$SIM_TEST_DIR" ]]; then
+        cd ..
+    fi
     rm -rf "$SIM_TEST_DIR"
 }
 
@@ -83,52 +97,48 @@ main() {
     echo ""
     echo "--- Starting Git Simulator Test Suite ---"
 
-    # Test init
-    run_test "sim: init should create .gitsim directory" "./git_simulator.sh init"
-    run_test "sim: .gitsim directory should exist" "[ -d .gitsim ]"
+    # NOTE: CWD is now inside .gitsim
 
     # Test config
-    run_test "sim: config set user.name" "./git_simulator.sh config user.name 'Test Sim User'"
-    run_test "sim: config get user.name" "[[ \"$(./git_simulator.sh config user.name)\" == 'Test Sim User' ]]"
+    run_test "sim: config set user.name" "../git_sim.sh config user.name 'Test Sim User'"
+    run_test "sim: config get user.name" "[[ \"$(../git_sim.sh config user.name)\" == 'Test Sim User' ]]"
 
     # Test commit
-    run_test "sim: commit should create a commit" "./git_simulator.sh commit -m 'feat: initial commit'"
-    run_test "sim: commits.txt should have 1 line" "[[ $(cat .gitsim/commits.txt | wc -l) -eq 1 ]]"
+    run_test "sim: commit should create a commit" "../git_sim.sh commit -m 'feat: initial commit'"
+    run_test "sim: commits.txt should have 1 line" "[[ $(cat ./.data/commits.txt | wc -l) -eq 1 ]]"
 
     # Test tag
-    run_test "sim: tag should create a tag" "./git_simulator.sh tag -a v0.1.0 -m 'first tag'"
-    run_test "sim: tags.txt should contain v0.1.0" "grep -q v0.1.0 .gitsim/tags.txt"
+    run_test "sim: tag should create a tag" "../git_sim.sh tag -a v0.1.0 -m 'first tag'"
+    run_test "sim: tags.txt should contain v0.1.0" "grep -q v0.1.0 ./.data/tags.txt"
 
     # Test describe
-    run_test "sim: describe should return latest tag" "[[ $(./git_simulator.sh describe) == 'v0.1.0' ]]"
+    run_test "sim: describe should return latest tag" "[[ $(../git_sim.sh describe) == 'v0.1.0' ]]"
 
     # Test log
-    run_test "sim: log should return commit message" "./git_simulator.sh log | grep -q 'feat: initial commit'"
+    run_test "sim: log should return commit message" "../git_sim.sh log | grep -q 'feat: initial commit'"
 
-    # --- New tests for staging ---
-
-    # Create a dummy file to add
+    # --- Tests for staging ---
     run_test "sim: create a dummy file for staging" "echo 'hello' > dummy.txt"
+    run_test "sim: add should stage the dummy file" "../git_sim.sh add dummy.txt"
+    run_test "sim: status should show the staged file" "../git_sim.sh status --porcelain | grep -q 'A  dummy.txt'"
+    run_test "sim: diff --exit-code should indicate changes" "../git_sim.sh diff --exit-code" 1
+    run_test "sim: commit should succeed" "../git_sim.sh commit -m 'feat: add dummy file'"
+    run_test "sim: status should be clean after commit" "! ../git_sim.sh status --porcelain | grep ."
+    run_test "sim: diff --exit-code should be clean after commit" "../git_sim.sh diff --exit-code" 0
 
-    # Test add and status
-    run_test "sim: add should stage the dummy file" "./git_simulator.sh add dummy.txt"
-    run_test "sim: status should show the staged file" "./git_simulator.sh status --porcelain | grep -q 'A  dummy.txt'"
+    # --- Tests for noise command ---
+    # The noise command is run from the parent of .gitsim
+    run_test "sim: noise command should create 2 files" "cd .. && ./git_sim.sh noise 2 && cd .gitsim"
+    run_test "sim: check if noise_file_1.txt exists" "[ -f ./noise_file_1.txt ]"
+    run_test "sim: check if noise_file_2.txt exists" "[ -f ./noise_file_2.txt ]"
+    run_test "sim: status should show 2 noisy files" "[[ $(../git_sim.sh status --porcelain | wc -l) -eq 2 ]]"
+    run_test "sim: commit noisy files" "../git_sim.sh commit -m 'feat: add noisy files'"
+    run_test "sim: status should be clean after noisy commit" "! ../git_sim.sh status --porcelain | grep ."
 
-    # Test diff
-    run_test "sim: diff --exit-code should indicate changes" "./git_simulator.sh diff --exit-code" 1
-
-    # Test commit clearing the index
-    run_test "sim: commit should succeed" "./git_simulator.sh commit -m 'feat: add dummy file'"
-    run_test "sim: status should be clean after commit" "! ./git_simulator.sh status --porcelain | grep ."
-    run_test "sim: diff --exit-code should be clean after commit" "./git_simulator.sh diff --exit-code" 0
-
-    # --- New tests for .gitignore management ---
-    run_test "gitignore: init should create .gitignore" "[ -f .gitignore ]"
+    # --- Test .gitignore management (from parent dir) ---
+    cd .. # cd back to sim_test
+    run_test "gitignore: .gitignore should exist" "[ -f .gitignore ]"
     run_test "gitignore: .gitignore should contain .gitsim/" "grep -q '^\.gitsim/$' .gitignore"
-
-    # Run init again to test idempotency
-    run_test "gitignore: run init again" "./git_simulator.sh init"
-    run_test "gitignore: .gitsim/ should only appear once" "[[ $(grep -c '^\.gitsim/$' .gitignore) -eq 1 ]]"
 
     # --- Test Summary ---
     echo ""

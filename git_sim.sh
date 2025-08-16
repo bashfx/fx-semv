@@ -1,0 +1,278 @@
+#!/usr/bin/env bash
+
+# git_sim.sh - A simulator for git commands for testing semv
+
+# --- Helper Functions ---
+
+# Find the root of the simulated repository by searching upwards for .gitsim
+find_sim_root() {
+    local dir="$PWD"
+    while [ "$dir" != "/" ]; do
+        if [ -d "$dir/.gitsim" ]; then
+            echo "$dir"
+            return 0
+        fi
+        dir=$(dirname "$dir")
+    done
+    return 1
+}
+
+# --- Subcommands ---
+
+# git init
+cmd_init() {
+    local SIM_DIR=".gitsim"
+    local DATA_DIR="$SIM_DIR/.data"
+
+    if [ -d "$DATA_DIR" ]; then
+        echo "Reinitialized existing Git simulator repository in $(pwd)/$SIM_DIR/"
+    else
+        mkdir -p "$DATA_DIR"
+        touch "$DATA_DIR/tags.txt"
+        touch "$DATA_DIR/commits.txt"
+        touch "$DATA_DIR/config"
+        touch "$DATA_DIR/index"
+        echo "main" > "$DATA_DIR/branch.txt"
+        touch "$DATA_DIR/HEAD"
+        echo "Initialized empty Git simulator repository in $(pwd)/$SIM_DIR/"
+    fi
+
+    if ! grep -q "^\.gitsim/$" .gitignore 2>/dev/null; then
+        echo ".gitsim/" >> .gitignore
+    fi
+    return 0
+}
+
+# All other commands need the root path to be passed to them
+cmd_config() {
+    local STATE_FILE_CONFIG="$1"; shift
+    local key="$1"
+    local value="$2"
+    if [ -n "$value" ]; then
+        echo "$key=$value" >> "$STATE_FILE_CONFIG"
+    else
+        grep "^$key=" "$STATE_FILE_CONFIG" | cut -d'=' -f2
+    fi
+    return 0
+}
+
+cmd_add() {
+    local STATE_FILE_INDEX="$1"; shift
+    if [[ "$1" == "." ]] || [[ "$1" == "--all" ]]; then
+        find . -type f -not -path "./.data/*" >> "$STATE_FILE_INDEX"
+    else
+        for file in "$@"; do
+            echo "$file" >> "$STATE_FILE_INDEX"
+        done
+    fi
+    sort -u "$STATE_FILE_INDEX" -o "$STATE_FILE_INDEX"
+    return 0
+}
+
+cmd_commit() {
+    local STATE_FILE_COMMITS="$1"
+    local STATE_FILE_HEAD="$2"
+    local STATE_FILE_INDEX="$3"
+    shift 3
+    local message=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -m) message="$2"; shift 2;;
+            *) shift;;
+        esac
+    done
+    if [ -z "$message" ]; then return 1; fi
+    local commit_hash
+    commit_hash=$(date +%s | shasum | head -c 7)
+    echo "$commit_hash $message" >> "$STATE_FILE_COMMITS"
+    echo "$commit_hash" > "$STATE_FILE_HEAD"
+    > "$STATE_FILE_INDEX"
+    return 0
+}
+
+cmd_tag() {
+    local STATE_FILE_TAGS="$1"; shift
+    if [[ $# -eq 0 ]]; then cat "$STATE_FILE_TAGS" | cut -d' ' -f1; return 0; fi
+    local tag_name=""
+    local message=""
+    local delete_tag=false
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -a) tag_name="$2"; shift 2;;
+            -m) message="$2"; shift 2;;
+            -d) delete_tag=true; tag_name="$2"; shift 2;;
+            --list) cat "$STATE_FILE_TAGS" | cut -d' ' -f1; return 0;;
+            *) return 1;;
+        esac
+    done
+    if [[ "$delete_tag" = true ]]; then
+        grep -v "^$tag_name " "$STATE_FILE_TAGS" > "$STATE_FILE_TAGS.tmp" && mv "$STATE_FILE_TAGS.tmp" "$STATE_FILE_TAGS"
+        return 0
+    fi
+    if [ -n "$tag_name" ]; then
+        echo "$tag_name $message" >> "$STATE_FILE_TAGS"
+        return 0
+    fi
+}
+
+cmd_log() {
+    local STATE_FILE_COMMITS="$1"; shift
+    awk '{$1=""; print $0}' "$STATE_FILE_COMMITS" | sed 's/^ //g'
+    return 0
+}
+
+cmd_describe() {
+    local STATE_FILE_TAGS="$1"; shift
+    cat "$STATE_FILE_TAGS" | cut -d' ' -f1 | sort -V | tail -n 1
+    return 0
+}
+
+cmd_rev_parse() {
+    local STATE_FILE_HEAD="$1"; shift
+    case "$1" in
+        --is-inside-work-tree) return 0;;
+        --show-toplevel) find_sim_root; return 0;;
+        HEAD) cat "$STATE_FILE_HEAD"; return 0;;
+        *) return 1;;
+    esac
+}
+
+cmd_branch() {
+    local STATE_FILE_BRANCH="$1"; shift
+    cat "$STATE_FILE_BRANCH"
+    return 0
+}
+
+cmd_symbolic_ref() {
+    shift # No state file needed, but still need to handle dispatcher args
+    if [[ "$1" == "refs/remotes/origin/HEAD" ]]; then
+        echo "refs/remotes/origin/main"
+        return 0
+    fi
+    return 1
+}
+
+cmd_show() {
+    shift # No state file needed
+    if [[ "$1" == "-s" ]] && [[ "$2" == "--format=%ct" ]] && [[ "$3" == "HEAD" ]]; then
+        date +%s
+        return 0
+    fi
+    return 1
+}
+
+cmd_show_ref() {
+    local STATE_FILE_TAGS="$1"; shift
+    if [[ "$1" == "--tags" ]]; then
+        cat "$STATE_FILE_TAGS" | cut -d' ' -f1
+        return 0
+    fi
+    return 1
+}
+
+cmd_rev_list() {
+    local STATE_FILE_COMMITS="$1"; shift
+    if [[ "$1" == "--count" ]]; then
+        wc -l < "$STATE_FILE_COMMITS" | tr -d ' '
+        return 0
+    fi
+    return 1
+}
+
+cmd_status() {
+    local STATE_FILE_INDEX="$1"; shift
+    if [[ "$1" == "--porcelain" ]]; then
+        if [ -s "$STATE_FILE_INDEX" ]; then
+            sed 's/^/A  /' "$STATE_FILE_INDEX"
+        fi
+        return 0
+    fi
+    return 1
+}
+
+cmd_fetch() { return 0; }
+cmd_push() { return 0; }
+
+cmd_diff() {
+    local STATE_FILE_INDEX="$1"; shift
+    if [[ "$1" == "--exit-code" ]]; then
+        if [ -s "$STATE_FILE_INDEX" ]; then return 1; else return 0; fi
+    fi
+    return 0
+}
+
+cmd_noise() {
+    local SIM_DIR="$1"
+    local DATA_DIR="$2"
+    shift 2
+    local num_files=${1:-1}
+    local i
+    local files_to_add=()
+    for i in $(seq 1 "$num_files"); do
+        local filename="noise_file_$i.txt"
+        head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32 > "$SIM_DIR/$filename"
+        files_to_add+=("$filename")
+    done
+    # We need to call the ADD command with the correct context
+    # This is tricky because add is meant to be called from dispatcher
+    # For now, just write to index directly
+    for file in "${files_to_add[@]}"; do
+        echo "$file" >> "$DATA_DIR/index"
+    done
+    sort -u "$DATA_DIR/index" -o "$DATA_DIR/index"
+    return 0
+}
+
+# --- Main Dispatcher ---
+
+main() {
+    local cmd="$1"
+    shift
+
+    if [ "$cmd" == "init" ]; then
+        cmd_init
+        return $?
+    fi
+
+    local SIM_ROOT
+    SIM_ROOT=$(find_sim_root)
+    if [[ -z "$SIM_ROOT" ]]; then
+        echo "fatal: not a git repository (or any of the parent directories): .gitsim" >&2
+        return 128
+    fi
+
+    local SIM_DIR="$SIM_ROOT/.gitsim"
+    local DATA_DIR="$SIM_DIR/.data"
+    local STATE_FILE_CONFIG="$DATA_DIR/config"
+    local STATE_FILE_TAGS="$DATA_DIR/tags.txt"
+    local STATE_FILE_COMMITS="$DATA_DIR/commits.txt"
+    local STATE_FILE_BRANCH="$DATA_DIR/branch.txt"
+    local STATE_FILE_HEAD="$DATA_DIR/HEAD"
+    local STATE_FILE_INDEX="$DATA_DIR/index"
+
+    case "$cmd" in
+        config)         cmd_config "$STATE_FILE_CONFIG" "$@";;
+        add)            cmd_add "$STATE_FILE_INDEX" "$@";;
+        commit)         cmd_commit "$STATE_FILE_COMMITS" "$STATE_FILE_HEAD" "$STATE_FILE_INDEX" "$@";;
+        tag)            cmd_tag "$STATE_FILE_TAGS" "$@";;
+        log)            cmd_log "$STATE_FILE_COMMITS" "$@";;
+        describe)       cmd_describe "$STATE_FILE_TAGS" "$@";;
+        rev-parse)      cmd_rev_parse "$STATE_FILE_HEAD" "$@";;
+        branch)         cmd_branch "$STATE_FILE_BRANCH" "$@";;
+        symbolic-ref)   cmd_symbolic_ref "$@" "$@";;
+        show)           cmd_show "$@" "$@";;
+        show-ref)       cmd_show_ref "$STATE_FILE_TAGS" "$@";;
+        rev-list)       cmd_rev_list "$STATE_FILE_COMMITS" "$@";;
+        status)         cmd_status "$STATE_FILE_INDEX" "$@";;
+        fetch)          cmd_fetch "$@";;
+        diff)           cmd_diff "$STATE_FILE_INDEX" "$@";;
+        push)           cmd_push "$@";;
+        noise)          cmd_noise "$SIM_DIR" "$DATA_DIR" "$@";;
+        *)
+            echo "git_simulator: unknown command '$cmd'" >&2
+            return 1
+            ;;
+    esac
+}
+
+main "$@"
