@@ -33,6 +33,12 @@ cmd_init() {
         touch "$STATE_FILE_HEAD"
         echo "Initialized empty Git simulator repository in $(pwd)/$SIM_DIR/"
     fi
+
+    # Ensure the .gitsim directory is ignored by the real git
+    if ! grep -q "^\.gitsim/$" .gitignore 2>/dev/null; then
+        echo ".gitsim/" >> .gitignore
+    fi
+
     return 0
 }
 

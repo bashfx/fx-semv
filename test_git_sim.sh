@@ -122,6 +122,14 @@ main() {
     run_test "sim: status should be clean after commit" "! ./git_simulator.sh status --porcelain | grep ."
     run_test "sim: diff --exit-code should be clean after commit" "./git_simulator.sh diff --exit-code" 0
 
+    # --- New tests for .gitignore management ---
+    run_test "gitignore: init should create .gitignore" "[ -f .gitignore ]"
+    run_test "gitignore: .gitignore should contain .gitsim/" "grep -q '^\.gitsim/$' .gitignore"
+
+    # Run init again to test idempotency
+    run_test "gitignore: run init again" "./git_simulator.sh init"
+    run_test "gitignore: .gitsim/ should only appear once" "[[ $(grep -c '^\.gitsim/$' .gitignore) -eq 1 ]]"
+
     # --- Test Summary ---
     echo ""
     echo "--- Simulator Test Suite Summary ---"
