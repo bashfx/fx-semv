@@ -145,6 +145,9 @@ main() {
     run_test "sync command should fix version drift" "../semv sync"
     run_test "validate command should pass after sync" "../semv validate"
     
+    # Add a new feature commit to prepare for bump
+    run_test "bump: create a new feature commit" "git commit --allow-empty -m 'feat: add another feature'"
+
     run_test "bump command should create new version" "../semv bump -y"
     
     run_test "git tag should be updated to v0.2.0" "git describe --tags --abbrev=0 | grep -q v0.2.0"

@@ -554,7 +554,7 @@ this_user() { git config user.name | tr -d ' '; }
 this_project() { basename "$(git rev-parse --show-toplevel)"; }
 which_main() { local ret=1; if has_commits; then git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'; ret=0; fi; return "$ret"; }
 last_commit() { local ret=1; if has_commits; then if git rev-parse HEAD >/dev/null 2>&1; then git show -s --format=%ct HEAD; ret=0; fi; fi; if [[ "$ret" -eq 1 ]]; then echo "0"; fi; return "$ret"; }
-since_last() { local tag="$1"; local label="$2"; local count; local ret=1; if is_repo; then count=$(git log --pretty=format:"%s" "${tag}"..HEAD | grep -cE "^${label}:"); echo "$count"; trace "[$count] [$label] changes since [$tag]"; ret=0; else error "Error. current dir not a git repo."; fi; return "$ret"; }
+since_last() { local tag="$1"; local label="$2"; local count; local ret=1; if is_repo; then count=$(git log --pretty=format:%s "${tag}"..HEAD | grep -cE "^${label}:"); echo "$count"; trace "[$count] [$label] changes since [$tag]"; ret=0; else error "Error. current dir not a git repo."; fi; return "$ret"; }
 __git_list_tags() { git show-ref --tags | cut -d '/' -f 3-; }
 __git_latest_tag() { local latest; local ret=1; if is_repo; then latest=$(git tag | sort -V | tail -n1); if [[ -n "$latest" ]]; then echo "$latest"; ret=0; fi; fi; return "$ret"; }
 __git_latest_semver() { local latest; local ret=1; if has_semver; then latest=$(git tag --list | grep -E 'v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1); if [[ -n "$latest" ]]; then echo "$latest"; ret=0; fi; fi; return "$ret"; }
@@ -601,77 +601,110 @@ if [[ -f "$dest" ]] && [[ -s "$dest" ]]; then ret=0; fi; return "$ret"; }
 # Command Functions
 #-------------------------------------------------------------------------------
 # From parts/semv_commands.sh & semv_sync_integration.sh
+_do_retag() {
+    local new_tag="$1"
+    local note
+    note=$(__prompt "Tag message" "auto tag bump")
+    if __git_tag_create "$new_tag" "$note"; then
+        info "Created tag: $new_tag"
+        if __git_push_tags "force"; then
+            okay "Pushed tags to remote"
+            if __confirm "Push commits for $new_tag and main to origin"; then
+                git push origin "$new_tag"
+                git push origin main
+                okay "Pushed commits to remote"
+            fi
+            return 0
+        else
+            error "Failed to push tags"
+            return 1
+        fi
+    else
+        error "Failed to create tag"
+        return 1
+    fi
+}
+
 do_bump() {
-    local force="${1:-1}";
-    local -a detected_types;
-    local has_sync_sources=0;
-    local latest;
-    local new_version;
-    local ret=1;
+    local force="${1:-1}"
+    local -a detected_types
+    local has_sync_sources=0
+    local latest
+    local new_version
 
     if ! is_repo; then
-        error "Not in a git repository";
-        return 1;
+        error "Not in a git repository"
+        return 1
     fi
 
-    info "Starting enhanced bump with sync integration...";
+    # Handle staged files BEFORE version calculation
+    if ! is_not_staged; then
+        if [[ "$opt_yes" -eq 0 ]]; then
+            info "Staged files found. Auto-committing..."
+            git add --all && git commit -m "fix: auto-commit staged files before bump"
+        else
+            if __confirm "You have uncommitted changes. Commit them now?"; then
+                git add --all && git commit -m "fix: auto-commit staged files before bump"
+            else
+                error "Cancelled due to uncommitted changes"
+                return 1
+            fi
+        fi
+    fi
 
-    # Detect sync sources
-    mapfile -t detected_types < <(_detect_project_type 2>/dev/null);
+    info "Starting enhanced bump with sync integration..."
+    mapfile -t detected_types < <(_detect_project_type 2>/dev/null)
     if [[ "${#detected_types[@]}" -gt 0 ]]; then
-        has_sync_sources=1;
-        info "Sync sources detected: ${detected_types[*]}";
+        has_sync_sources=1
+        info "Sync sources detected: ${detected_types[*]}"
     fi
 
-    # Pre-bump validation and sync
     if [[ "$has_sync_sources" -eq 1 ]]; then
-        info "Performing pre-bump sync...";
+        info "Performing pre-bump sync..."
         if ! do_validate; then
-            warn "Version drift detected before bump";
+            warn "Version drift detected before bump"
             if [[ "$force" -ne 0 ]] && ! __confirm "Continue with version drift"; then
-                error "Bump cancelled due to version drift";
-                return 1;
+                error "Bump cancelled due to version drift"
+                return 1
             fi
             if __confirm "Auto-sync before bump"; then
                 if ! do_sync; then
-                    error "Failed to sync before bump";
-                    return 1;
+                    error "Failed to sync before bump"
+                    return 1
                 fi
             fi
         fi
     fi
 
-    # Perform the version bump
-    latest=$(do_latest_tag);
-    new_version=$(do_next_semver "$force");
-    ret=$?;
+    latest=$(do_latest_tag)
+    new_version=$(do_next_semver "$force")
 
-    if [[ "$ret" -eq 0 ]] && [[ -n "$new_version" ]]; then
-        trace "Bump: $latest -> $new_version";
+    if [[ "$new_version" == "$latest" ]]; then
+        okay "No new version-bumping commits found. Nothing to do."
+        return 0
+    fi
+
+    if [[ -n "$new_version" ]]; then
+        trace "Bump: $latest -> $new_version"
         if _do_retag "$new_version" "$latest"; then
-            okay "Git version bumped successfully: $new_version";
-
-            # Post-bump sync
+            okay "Git version bumped successfully: $new_version"
             if [[ "$has_sync_sources" -eq 1 ]]; then
-                info "Performing post-bump sync...";
+                info "Performing post-bump sync..."
                 if do_sync; then
-                    okay "All sources synced to: $new_version";
+                    okay "All sources synced to: $new_version"
                 else
-                    warn "Post-bump sync failed - manual sync may be required";
+                    warn "Post-bump sync failed - manual sync may be required"
                 fi
             fi
-            ret=0;
+            return 0
         else
-            error "Failed to create version tag";
-            ret=1;
+            return 1 # _do_retag already printed an error
         fi
     else
-        error "Failed to calculate next version";
+        error "Failed to calculate next version"
+        return 1
     fi
-
-    return "$ret";
 }
-_do_retag() { local new_tag="$1"; local current_tag="$2"; local note; local ret=1; if [[ -z "$new_tag" ]]; then error "Missing new tag"; return 1; fi; if ! has_semver || ! is_main; then error "Can only retag on main branch with existing semver"; return 1; fi; if ! do_is_greater "$new_tag" "$current_tag"; then error "New version ($new_tag) is not greater than current ($current_tag)"; return 1; fi; if ! is_not_staged; then if __confirm "You have uncommitted changes. Commit them with this tag"; then git add --all; git commit -m "auto: adding changes for retag @${new_tag}"; else error "Cancelled due to uncommitted changes"; return 1; fi; fi; note=$(__prompt "Tag message" "auto tag bump"); if __git_tag_create "$new_tag" "$note"; then info "Created tag: $new_tag"; if __git_push_tags "force"; then okay "Pushed tags to remote"; if __confirm "Push commits for $new_tag and main to origin"; then git push origin "$new_tag"; git push origin main; okay "Pushed commits to remote"; fi; ret=0; else error "Failed to push tags"; fi; else error "Failed to create tag"; fi; return "$ret"; }
 
 do_days_ago() {
     local last;
@@ -869,7 +902,14 @@ do_fetch_tags() { if ! is_repo; then error "Not in a git repository"; return 1; 
 do_tags() { local tags; if ! is_repo; then error "Not in a git repository"; return 1; fi; tags=$(__git_list_tags); info "Repository tags:"; printf "%s\n" "$tags" >&2; return 0; }
 do_inspect() { info "Available functions:"; declare -F | grep 'do_' | awk '{print $3}' >&2; info "Dispatch mappings:"; info "(Dispatch table inspection not implemented yet)"; return 0; }
 do_label_help() { local msg=""; msg+="~~ SEMV Commit Labels ~~\n"; msg+="${spark} ${green}brk:${x}  -> Breaking changes [Major]\n"; msg+="${spark} ${green}feat:${x} -> New features [Minor]\n"; msg+="${spark} ${green}fix:${x}  -> Bug fixes [Patch]\n"; msg+="${spark} ${green}dev:${x}  -> Development notes [Dev Build]\n"; printf "%b\n" "$msg" >&2; return 0; }
-do_auto() { local path="$1"; local cmd="$2"; error "Auto mode not implemented yet"; return 1; }
+do_auto() {
+    info "Running in auto mode..."
+    # Force non-interactive mode for all confirmations
+    opt_yes=0
+    # Call the main bump function
+    do_bump
+    return $?
+}
 
 #-------------------------------------------------------------------------------
 # Sync and Workflow Commands

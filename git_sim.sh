@@ -83,9 +83,20 @@ cmd_config() {
 }
 
 cmd_add() {
-    local STATE_FILE_INDEX="$1"; shift
+    local STATE_FILE_INDEX="$1"
+    local SIM_ROOT="$2"
+    shift 2
+
+    # The directory where we store git's internal state
+    local GIT_DIR="$SIM_ROOT/.gitsim"
+
     if [[ "$1" == "." ]] || [[ "$1" == "--all" ]]; then
-        find . -type f -not -path "./.data/*" >> "$STATE_FILE_INDEX"
+        # For 'add .', we find all files in the repo root, excluding the .gitsim directory
+        > "$STATE_FILE_INDEX"
+
+        # We must change to the SIM_ROOT to get relative paths correctly.
+        (cd "$SIM_ROOT" && find . -type f -not -path "./.gitsim/*" -not -path "./.git/*" | sed 's|^\./||') >> "$STATE_FILE_INDEX"
+
     else
         for file in "$@"; do
             echo "$file" >> "$STATE_FILE_INDEX"
@@ -101,13 +112,21 @@ cmd_commit() {
     local STATE_FILE_INDEX="$3"
     shift 3
     local message=""
+    local allow_empty=false
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -m) message="$2"; shift 2;;
+            --allow-empty) allow_empty=true; shift;;
             *) shift;;
         esac
     done
     if [ -z "$message" ]; then return 1; fi
+
+    if [ "$allow_empty" = false ] && ! [ -s "$STATE_FILE_INDEX" ]; then
+        echo "nothing to commit, working tree clean" >&2
+        return 1
+    fi
+
     local commit_hash
     commit_hash=$( (echo "$message" ; date +%s) | shasum | head -c 7)
     echo "$commit_hash $message" >> "$STATE_FILE_COMMITS"
@@ -134,10 +153,16 @@ cmd_tag() {
         esac
     done
     if [[ "$delete_tag" = true ]]; then
-        grep -v "^$tag_name " "$STATE_FILE_TAGS" > "$STATE_FILE_TAGS.tmp" && mv "$STATE_FILE_TAGS.tmp" "$STATE_FILE_TAGS"
+        # Use sed to delete the line in-place. This is more robust than the grep/mv pattern.
+        sed -i "/^$tag_name /d" "$STATE_FILE_TAGS"
         return 0
     fi
     if [ -n "$tag_name" ]; then
+        # Check if tag already exists
+        if grep -q "^$tag_name " "$STATE_FILE_TAGS"; then
+            echo "fatal: tag '$tag_name' already exists" >&2
+            return 128
+        fi
         local commit_hash
         commit_hash=$(cat "$STATE_FILE_HEAD")
         if [ -z "$commit_hash" ]; then
@@ -271,7 +296,7 @@ cmd_diff() {
 }
 
 cmd_noise() {
-    local SIM_DIR="$1"
+    local SIM_ROOT="$1"
     local DATA_DIR="$2"
     shift 2
     local num_files=${1:-1}
@@ -279,25 +304,21 @@ cmd_noise() {
     local names=("README" "script" "status" "main" "feature" "hotfix" "docs")
     local exts=(".md" ".fake" ".log" ".sh" ".txt" ".tmp")
 
-    local files_to_add=()
     for i in $(seq 1 "$num_files"); do
         local rand_name=${names[$RANDOM % ${#names[@]}]}
         local rand_ext=${exts[$RANDOM % ${#exts[@]}]}
-        local filename="${rand_name}${rand_ext}"
+        local filename="${rand_name}_${i}${rand_ext}"
 
         # Create the file in the simulated workspace root
-        head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32 > "$SIM_DIR/$filename"
-        files_to_add+=("$filename")
+        head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32 > "$SIM_ROOT/$filename"
+        echo "$filename" >> "$DATA_DIR/index"
     done
 
-    # Stage the new files by adding them to the index
-    for file in "${files_to_add[@]}"; do
-        echo "$file" >> "$DATA_DIR/index"
-    done
     sort -u "$DATA_DIR/index" -o "$DATA_DIR/index"
-    echo "Created and staged ${#files_to_add[@]} noisy file(s)."
+    echo "Created and staged ${num_files} noisy file(s)."
     return 0
 }
+
 
 # --- Main Dispatcher ---
 
@@ -334,7 +355,7 @@ main() {
 
     case "$cmd" in
         config)         cmd_config "$STATE_FILE_CONFIG" "$@";;
-        add)            cmd_add "$STATE_FILE_INDEX" "$@";;
+        add)            cmd_add "$STATE_FILE_INDEX" "$SIM_ROOT" "$@";;
         commit)         cmd_commit "$STATE_FILE_COMMITS" "$STATE_FILE_HEAD" "$STATE_FILE_INDEX" "$@";;
         tag)            cmd_tag "$STATE_FILE_TAGS" "$STATE_FILE_HEAD" "$@";;
         log)            cmd_log "$STATE_FILE_COMMITS" "$STATE_FILE_TAGS" "$@";;
@@ -349,7 +370,7 @@ main() {
         fetch)          cmd_fetch "$@";;
         diff)           cmd_diff "$STATE_FILE_INDEX" "$@";;
         push)           cmd_push "$@";;
-        noise)          cmd_noise "$SIM_DIR" "$DATA_DIR" "$@";;
+        noise)          cmd_noise "$SIM_ROOT" "$DATA_DIR" "$@";;
         *)
             echo "git_simulator: unknown command '$cmd'" >&2
             usage
