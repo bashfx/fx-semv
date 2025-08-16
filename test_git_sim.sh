@@ -126,14 +126,17 @@ main() {
     run_test "sim: status should be clean after commit" "! ../git_sim.sh status --porcelain | grep ."
     run_test "sim: diff --exit-code should be clean after commit" "../git_sim.sh diff --exit-code" 0
 
-    # --- Tests for noise command ---
+    # --- Tests for noise command (enhanced) ---
     # The noise command is run from the parent of .gitsim
     run_test "sim: noise command should create 2 files" "cd .. && ./git_sim.sh noise 2 && cd .gitsim"
-    run_test "sim: check if noise_file_1.txt exists" "[ -f ./noise_file_1.txt ]"
-    run_test "sim: check if noise_file_2.txt exists" "[ -f ./noise_file_2.txt ]"
     run_test "sim: status should show 2 noisy files" "[[ $(../git_sim.sh status --porcelain | wc -l) -eq 2 ]]"
+    run_test "sim: noisy files should not have default name" "! ../git_sim.sh status --porcelain | grep -q 'noise_file_'"
+
+    # --- New test for human-readable status ---
+    run_test "sim: status without porcelain should be human-readable" "../git_sim.sh status | grep -q 'Changes to be committed:'"
     run_test "sim: commit noisy files" "../git_sim.sh commit -m 'feat: add noisy files'"
-    run_test "sim: status should be clean after noisy commit" "! ../git_sim.sh status --porcelain | grep ."
+    run_test "sim: status should be clean after noisy commit" "! ../git_sim.sh status | grep 'new file:'"
+
 
     # --- Test .gitignore management (from parent dir) ---
     cd .. # cd back to sim_test

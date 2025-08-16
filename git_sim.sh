@@ -186,8 +186,19 @@ cmd_status() {
             sed 's/^/A  /' "$STATE_FILE_INDEX"
         fi
         return 0
+    else
+        # Human-readable output
+        echo "On branch main"
+        echo "Changes to be committed:"
+        echo "  (use \"git restore --staged <file>...\" to unstage)"
+        if [ -s "$STATE_FILE_INDEX" ]; then
+            sed 's/^/\tnew file:   /' "$STATE_FILE_INDEX"
+        else
+            echo ""
+            echo "nothing to commit, working tree clean"
+        fi
+        return 0
     fi
-    return 1
 }
 
 cmd_fetch() { return 0; }
@@ -206,20 +217,27 @@ cmd_noise() {
     local DATA_DIR="$2"
     shift 2
     local num_files=${1:-1}
-    local i
+
+    local names=("README" "script" "status" "main" "feature" "hotfix" "docs")
+    local exts=(".md" ".fake" ".log" ".sh" ".txt" ".tmp")
+
     local files_to_add=()
     for i in $(seq 1 "$num_files"); do
-        local filename="noise_file_$i.txt"
+        local rand_name=${names[$RANDOM % ${#names[@]}]}
+        local rand_ext=${exts[$RANDOM % ${#exts[@]}]}
+        local filename="${rand_name}${rand_ext}"
+
+        # Create the file in the simulated workspace root
         head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32 > "$SIM_DIR/$filename"
         files_to_add+=("$filename")
     done
-    # We need to call the ADD command with the correct context
-    # This is tricky because add is meant to be called from dispatcher
-    # For now, just write to index directly
+
+    # Stage the new files by adding them to the index
     for file in "${files_to_add[@]}"; do
         echo "$file" >> "$DATA_DIR/index"
     done
     sort -u "$DATA_DIR/index" -o "$DATA_DIR/index"
+    echo "Created and staged ${#files_to_add[@]} noisy file(s)."
     return 0
 }
 
