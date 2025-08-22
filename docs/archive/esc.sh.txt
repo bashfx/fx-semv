@@ -1,0 +1,26 @@
+  red=$'\x1B[31m';
+  orange=$'\x1B[38;5;214m';
+  yellow=$'\x1B[33m';  
+  green=$'\x1B[32m';
+  blue=$'\x1B[38;5;39m';
+  cyan=$'\x1B[38;5;14m';
+  magenta=$'\x1B[35m';  
+  purple=$'\x1B[38;5;213m';
+  white=$'\x1B[38;5;15m';
+  grey=$'\x1B[38;5;249m';
+  grey2=$'\x1B[38;5;240m'; #dark
+  xx=$'\x1B[0m';     # Alias for reset
+
+  #matching icon set now
+  fail=$'\u2715';
+  pass=$'\u2713';
+  recv=$'\u27F2';
+  delta=$'\u25B3'
+  boto=$'\u232C';
+  star=$'\xE2\x98\x85';
+  lambda=$'\xCE\xBB';
+  idots=$'\xE2\x80\xA6';
+  bolt=$'\xE2\x86\xAF';
+  redo=$'\xE2\x86\xBB';
+  spark=$'\u273B'    # ✻ snowflake/star
+  unlock=$'\u26BF'   # ⚿ unlocked padlock
