@@ -1,0 +1,20 @@
+# Build Map for SEMV
+# Format: NN : target_filename.sh
+# Lines starting with # are ignored
+# Place this file in: parts/build.map
+
+01 : 01_config.sh
+02 : 02_colors.sh
+03 : 03_printers.sh
+04 : 04_options.sh
+05 : 05_guards.sh
+06 : 06_git-ops.sh
+07 : 07_version.sh
+08 : 08_detect.sh
+09 : 09_resolve.sh
+10 : 10_getset.sh
+11 : 11_semver.sh
+12 : 12_lifecycle.sh
+13 : 13_commands.sh
+14 : 14_hooks.sh
+15 : 15_dispatch.sh

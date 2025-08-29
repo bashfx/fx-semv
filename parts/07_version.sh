@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #
 # semv-version.sh - Version Parsing and Comparison Logic
 # semv-revision: 2.0.0-dev_1
@@ -272,6 +271,84 @@ do_test_semver() {
     fi
     
     return "$ret";
+}
+
+################################################################################
+#
+#  __version_greater - Compare two semantic versions
+#
+################################################################################
+# Arguments:
+#   1: version1 - First version (e.g., "1.2.3" or "v1.2.3")
+#   2: version2 - Second version (e.g., "1.2.1" or "v1.2.1")  
+# Returns: 0 if version1 > version2, 1 otherwise
+
+__version_greater() {
+    local v1="$1";
+    local v2="$2";
+    
+    # Handle empty or invalid inputs
+    if [[ -z "$v1" ]] || [[ -z "$v2" ]]; then
+        return 1;
+    fi
+    
+    # Remove v prefix if present
+    v1="${v1#v}";
+    v2="${v2#v}";
+    
+    # Split versions into arrays
+    IFS='.' read -ra v1_parts <<< "$v1";
+    IFS='.' read -ra v2_parts <<< "$v2";
+    
+    # Validate we have at least 3 parts (major.minor.patch)
+    if [[ ${#v1_parts[@]} -lt 3 ]] || [[ ${#v2_parts[@]} -lt 3 ]]; then
+        warn "Invalid version format for comparison: '$1' vs '$2'";
+        return 1;
+    fi
+    
+    # Compare major, minor, patch
+    for i in {0..2}; do
+        local p1="${v1_parts[i]:-0}";
+        local p2="${v2_parts[i]:-0}";
+        
+        # Validate numeric values
+        if ! [[ "$p1" =~ ^[0-9]+$ ]] || ! [[ "$p2" =~ ^[0-9]+$ ]]; then
+            warn "Non-numeric version component: p1='$p1', p2='$p2'";
+            return 1;
+        fi
+        
+        if [[ "$p1" -gt "$p2" ]]; then
+            return 0;  # v1 > v2
+        elif [[ "$p1" -lt "$p2" ]]; then
+            return 1;  # v1 < v2
+        fi
+        # If equal, continue to next part
+    done
+    
+    return 1;  # versions are equal, so v1 is not > v2
+}
+
+################################################################################
+#
+#  __validate_semver - Validate semantic version format
+#
+################################################################################
+# Arguments:
+#   1: version - Version string to validate (e.g., "1.2.3" or "v1.2.3")
+# Returns: 0 if valid semver, 1 if invalid
+
+__validate_semver() {
+    local version="$1";
+    
+    # Remove v prefix if present
+    version="${version#v}";
+    
+    # Check format: X.Y.Z where X,Y,Z are numbers
+    if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        return 0;
+    fi
+    
+    return 1;
 }
 
 # Mark version as loaded (load guard pattern)

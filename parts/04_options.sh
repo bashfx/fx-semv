@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #
 # semv-options.sh - Flag Parsing and Options
 # semv-revision: 2.0.0-dev_1

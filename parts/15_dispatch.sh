@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #
 # semv-dispatch.sh - Command Routing and Main Interface
 # semv-revision: 2.0.0-dev_1
@@ -59,7 +58,11 @@ dispatch() {
         upst|upstream)     func_name="do_remote_compare";;
         rbc|remote-build-compare) func_name="do_rbuild_compare";;
         
-        # Future Sync Commands (Phase 4)
+        # Version Get/Set Commands (Phase 4A)
+        get)               func_name="do_get";;
+        set)               func_name="do_set";;
+        
+        # Sync Commands (Phase 4B)
         sync)              func_name="do_sync";;
         validate)          func_name="do_validate";;
         drift)             func_name="do_drift";;
@@ -73,6 +76,12 @@ dispatch() {
         install)           func_name="do_install";;
         uninstall)         func_name="do_uninstall";;
         reset)             func_name="do_reset";;
+        
+        # Channel Promotion Commands
+        promote)           func_name="do_promote";;
+        
+        # Hook Management Commands
+        hook)              func_name="do_hook";;
         
         # Development Commands
         inspect)           func_name="do_inspect";;
@@ -100,6 +109,7 @@ dispatch() {
     if [[ -n "$func_name" ]]; then
         if function_exists "$func_name"; then
             trace "Dispatching: $cmd -> $func_name";
+            shift; shift; # Remove first two args, leaving only the parameters for the command
             "$func_name" "$arg" "$arg2" "$@";
             ret=$?;
         else
@@ -149,10 +159,16 @@ ${bld}REPOSITORY MANAGEMENT:${x}
     ${green}can${x}               Check if repo can use semver
     ${green}fetch${x}             Fetch remote tags
 
-${bld}SYNCHRONIZATION:${x} ${grey}(Future)${x}
+${bld}VERSION GET/SET:${x}
+    ${green}get all${x}           Show all detected version sources
+    ${green}get rust${x}          Show Rust version (Cargo.toml)
+    ${green}get js${x}            Show JavaScript version (package.json)
+    ${green}get python${x}        Show Python version (pyproject.toml)
+    ${green}get bash FILE${x}     Show bash script version comment
+    ${green}set TYPE VER [FILE]${x} Update version in specified source
+
+${bld}SYNCHRONIZATION:${x}
     ${green}sync${x}              Auto-detect and sync all sources
-    ${green}sync rust${x}         Sync with Cargo.toml
-    ${green}sync js${x}           Sync with package.json
 
 ${bld}FLAGS:${x}
     ${yellow}-d${x}                Enable debug messages
@@ -172,6 +188,8 @@ ${bld}EXAMPLES:${x}
     semv                  # Show current version
     semv bump             # Bump and tag new version
     semv info             # Show project status
+    semv get all          # Show all version sources
+    semv set rust 1.2.3   # Update Rust version
     semv -d pend          # Debug mode, show pending changes
 ";
 
@@ -216,3 +234,8 @@ main() {
 
 # Mark dispatch as loaded (load guard pattern)
 readonly SEMV_DISPATCH_LOADED=1;
+
+# Main execution handler (only run if script is executed, not sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@";
+fi

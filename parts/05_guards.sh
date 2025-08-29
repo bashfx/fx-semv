@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #
 # semv-guards.sh - Validation and State Check Functions
 # semv-revision: 2.0.0-dev_1

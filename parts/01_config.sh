@@ -40,12 +40,12 @@ export TERM=xterm-256color;
 ################################################################################
 
 # Standard BashFX flag variables (set by options())
-opt_debug=1;       # 0=enabled, 1=disabled (default off)
-opt_trace=1;       # 0=enabled, 1=disabled (default off)  
-opt_quiet=1;       # 0=enabled, 1=disabled (default off)
-opt_force=1;       # 0=enabled, 1=disabled (default off)
-opt_yes=1;         # 0=enabled, 1=disabled (default off)
-opt_dev=1;         # 0=enabled, 1=disabled (default off)
+opt_debug=0;       # 0=disabled, 1=enabled (default off)
+opt_trace=0;       # 0=disabled, 1=enabled (default off)  
+opt_quiet=0;       # 0=disabled, 1=enabled (default off - show messages)
+opt_force=0;       # 0=disabled, 1=enabled (default off)
+opt_yes=0;         # 0=disabled, 1=enabled (default off)
+opt_dev=0;         # 0=disabled, 1=enabled (default off)
 
 # SEMV-specific option states
 opt_dev_note=1;    # 0=enabled, 1=disabled (default off)

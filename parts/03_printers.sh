@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #
 # semv-printers.sh - Output and Printing Functions
 # semv-revision: 2.0.0-dev_1 
@@ -91,7 +90,7 @@ error() {
     local msg="$1";
     local ret=1;
     
-    if [[ "$opt_quiet" -ne 0 ]]; then
+    if [[ "$opt_quiet" -eq 0 ]]; then
         __printf "${fail_red} ${msg}\n" "red";
         ret=0;
     fi

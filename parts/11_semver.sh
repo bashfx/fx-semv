@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #
 # semv-semver.sh - Core Semantic Versioning Business Logic
 # semv-revision: 2.0.0-dev_1
@@ -158,17 +157,23 @@ do_next_semver() {
     
     # Parse current version
     parts=$(split_vers "$tag");
-    if [[ $? -ne 0 ]]; then
+    if [[ $? -ne 0 ]] || [[ -z "$parts" ]]; then
         error "Invalid version format: $tag";
         return 1;
     fi
     
     # Extract version components
     local -a components=($parts);
-    major="${components[0]}";
-    minor="${components[1]}";
-    patch="${components[2]}";
-    extra="${components[3]}";
+    major="${components[0]:-0}";
+    minor="${components[1]:-0}";
+    patch="${components[2]:-0}";
+    extra="${components[3]:-}";
+    
+    # Validate numeric components
+    if ! [[ "$major" =~ ^[0-9]+$ ]] || ! [[ "$minor" =~ ^[0-9]+$ ]] || ! [[ "$patch" =~ ^[0-9]+$ ]]; then
+        error "Non-numeric version components from: $tag (got major='$major', minor='$minor', patch='$patch')";
+        return 1;
+    fi
     
     # Analyze changes to determine bump
     if ! do_change_count "$tag"; then
@@ -255,4 +260,18 @@ do_build_file() {
     
     # Determine destination path
     if [[ "$opt_build_dir" -eq 0 ]]; then
-        if !
+        dest="$filename";
+    else
+        dest="$BUILD_DIR/$filename";
+    fi
+    
+    # Write build cursor file
+    if printf "%s\n" "$(date)" > "$dest"; then
+        ret=0;
+    fi
+    
+    return "$ret";
+}
+
+# Mark semver as loaded (load guard pattern)
+readonly SEMV_SEMVER_LOADED=1;

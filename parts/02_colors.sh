@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #
 # semv-colors.sh - Color and Glyph Definitions  
 # semv-revision: 2.0.0-dev_1

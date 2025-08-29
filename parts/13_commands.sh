@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #
 # semv-commands.sh - High-Order Command Functions
 # semv-revision: 2.0.0-dev_1
@@ -445,6 +444,66 @@ do_auto() {
     # Placeholder for auto mode implementation
     error "Auto mode not implemented yet";
     return 1;
+}
+
+################################################################################
+#
+#  do_sync - Version synchronization and conflict resolution
+#
+################################################################################
+# Returns: 0 on success, 1 on failure
+# Stream Usage: Messages to stderr
+
+################################################################################
+#
+#  do_since_pretty - Pretty format for time since last commit
+#
+################################################################################
+
+do_since_pretty() {
+    local seconds;
+    seconds=$(_seconds_since_last_commit 2>/dev/null);
+    if [[ -n "$seconds" ]]; then
+        _pretty_duration "$seconds";
+    else
+        printf "unknown";
+    fi
+}
+
+################################################################################
+#
+#  do_days_ago - Days since last commit
+#
+################################################################################
+
+do_days_ago() {
+    local seconds;
+    seconds=$(_seconds_since_last_commit 2>/dev/null);
+    if [[ -n "$seconds" ]]; then
+        printf "%d" $((seconds / 86400));
+    else
+        printf "0";
+    fi
+}
+
+################################################################################
+#
+#  do_sync - Version synchronization and conflict resolution
+#
+################################################################################
+# Returns: 0 on success, 1 on failure
+# Stream Usage: Messages to stderr
+
+do_sync() {
+    info "Starting version synchronization and conflict resolution...";
+    
+    if resolve_version_conflicts; then
+        okay "Version synchronization completed successfully";
+        return 0;
+    else
+        error "Version synchronization failed";
+        return 1;
+    fi
 }
 
 # Mark commands as loaded (load guard pattern)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build.sh - Assemble script from numbered modular parts
+# build.sh - Assemble script from numbered modular parts (enhanced with build.map)
 
 set -euo pipefail
 
@@ -12,13 +12,149 @@ readonly x=$'\033[38;5;244m';
 
 # Configuration
 PARTS_DIR="parts";
-OUTPUT_FILE="watchdom_fixed.sh";
-TEMPLATE_FILE="template.sh";
+OUTPUT_FILE="semv.sh";
+BUILD_MAP="parts/build.map";
+USE_BUILD_MAP=false;
+
+# Read build map if it exists
+declare -A build_map_targets=()
+read_build_map() {
+    if [[ ! -f "$BUILD_MAP" ]]; then
+        return 1
+    fi
+    
+    printf "%sReading build map: %s%s\n" "$blue" "$BUILD_MAP" "$x"
+    
+    while IFS= read -r line; do
+        # Skip comments and empty lines
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "${line// }" ]] && continue
+        
+        # Parse: NN : target_filename.sh
+        if [[ "$line" =~ ^([0-9]+)[[:space:]]*:[[:space:]]*(.+)$ ]]; then
+            local num="${BASH_REMATCH[1]}"
+            local target="${BASH_REMATCH[2]// /}"  # Remove spaces
+            build_map_targets["$num"]="$target"
+            printf "  %s%s%s → %s\n" "$green" "$num" "$x" "$target"
+        fi
+    done < "$BUILD_MAP"
+    
+    if [[ ${#build_map_targets[@]} -gt 0 ]]; then
+        USE_BUILD_MAP=true
+        return 0
+    else
+        printf "%sWARN:%s No valid mappings found in %s\n" "$yellow" "$x" "$BUILD_MAP"
+        return 1
+    fi
+}
+
+# Rename files according to build map
+rename_from_build_map() {
+    if [[ "$USE_BUILD_MAP" != true ]]; then
+        return 0
+    fi
+    
+    printf "\n%sRenaming files according to build map...%s\n" "$yellow" "$x"
+    
+    # 1. Get all .sh files in parts directory
+    local all_files=()
+    while IFS= read -r -d '' file; do
+        all_files+=("$(basename "$file")")
+    done < <(find "$PARTS_DIR" -name "*.sh" -print0)
+
+    # 2. Get all target filenames from build.map
+    local target_files=()
+    for target in "${build_map_targets[@]}"; do
+        target_files+=("$target")
+    done
+
+    # 3. Create a list of unprocessed files by filtering out correct ones
+    local unprocessed_files=()
+    local correct_files=()
+    for file in "${all_files[@]}"; do
+        local is_target=false
+        for target in "${target_files[@]}"; do
+            if [[ "$file" == "$target" ]]; then
+                is_target=true
+                correct_files+=("$file")
+                break
+            fi
+        done
+        if [[ "$is_target" == false ]]; then
+            unprocessed_files+=("$file")
+        fi
+    done
+
+    if [[ ${#correct_files[@]} -gt 0 ]]; then
+        printf "  Found %d correctly named file(s): %s\n" "${#correct_files[@]}" "${correct_files[*]}"
+    fi
+    if [[ ${#unprocessed_files[@]} -gt 0 ]]; then
+        printf "  Found %d unprocessed file(s) to rename: %s\n" "${#unprocessed_files[@]}" "${unprocessed_files[*]}"
+    fi
+
+    # 4. Process the unprocessed files
+    for file in "${unprocessed_files[@]}"; do
+        # Extract number from filename.
+        local num
+        if ! num=$(echo "$file" | grep -oE '[0-9]+'); then
+            printf "  %sWARN:%s Could not extract number from '%s', skipping.\n" "$yellow" "$x" "$file"
+            continue
+        fi
+        
+        # We might get multiple numbers, take the first one.
+        num=$(echo "$num" | head -n1)
+        # Format to 2 digits (e.g., 3 -> 03)
+        printf -v num "%02d" "$num"
+
+        if [[ -n "${build_map_targets[$num]}" ]]; then
+            local target="${build_map_targets[$num]}"
+            local source_path="$PARTS_DIR/$file"
+            local target_path="$PARTS_DIR/$target"
+            printf "  %s✓%s Renaming %s → %s\n" "$green" "$x" "$file" "$target"
+            mv "$source_path" "$target_path"
+        else
+            printf "  %sWARN:%s No target in build.map for number '%s' (from file '%s'), skipping.\n" "$yellow" "$x" "$num" "$file"
+        fi
+    done
+
+    # 5. Cleanup: Get a fresh list of files and remove any not in the build map targets.
+    printf "\n%sCleaning up artifacts...%s\n" "$yellow" "$x"
+    local final_files=()
+    while IFS= read -r -d '' file; do
+        final_files+=("$(basename "$file")")
+    done < <(find "$PARTS_DIR" -name "*.sh" -print0)
+
+    for file in "${final_files[@]}"; do
+        local is_target=false
+        for target in "${target_files[@]}"; do
+            if [[ "$file" == "$target" ]]; then
+                is_target=true
+                break
+            fi
+        done
+        if [[ "$is_target" == false ]]; then
+            # As a safeguard, only remove files with numbers in them
+            if [[ "$file" =~ [0-9] ]]; then
+                printf "  %s🗑%s  Removing artifact: %s\n" "$red" "$x" "$file"
+                rm -f "$PARTS_DIR/$file"
+            fi
+        fi
+    done
+    
+    printf "\n%s✓ Rename complete!%s\n" "$green" "$x"
+}
 
 main() {
     printf "%sBuilding script from numbered modular parts%s\n" "$blue" "$x";
     printf "Parts directory: %s\n" "$PARTS_DIR";
     printf "Output file: %s\n\n" "$OUTPUT_FILE";
+    
+    # Try to read build map
+    if read_build_map; then
+        printf "\n%sUsing build map for file discovery%s\n" "$green" "$x"
+    else
+        printf "%sNo build map found, using auto-discovery%s\n" "$yellow" "$x"
+    fi
     
     # Verify parts directory exists
     if [[ ! -d "$PARTS_DIR" ]]; then
@@ -28,19 +164,35 @@ main() {
     
     # Auto-discover numbered modules in order
     local modules=()
-    while IFS= read -r -d '' file; do
-        local basename_file
-        basename_file=$(basename "$file")
-        # Check if file matches pattern: NN_*.sh (where NN is 2+ digits)
-        if [[ "$basename_file" =~ ^[0-9]{2,}_.*\.sh$ ]]; then
-            modules+=("$basename_file")
-        fi
-    done < <(find "$PARTS_DIR" -name "[0-9]*_*.sh" -print0 | sort -z)
+    if [[ "$USE_BUILD_MAP" == true ]]; then
+        # Use build map for discovery
+        for num in $(printf '%s\n' "${!build_map_targets[@]}" | sort -n); do
+            local target="${build_map_targets[$num]}"
+            if [[ -f "$PARTS_DIR/$target" ]]; then
+                modules+=("$target")
+            else
+                printf "%sERROR:%s Mapped file not found: %s\n" "$red" "$x" "$target" >&2
+                exit 1
+            fi
+        done
+    else
+        # Original auto-discovery logic
+        while IFS= read -r -d '' file; do
+            local basename_file
+            basename_file=$(basename "$file")
+            # Check if file matches pattern: N+_*.sh (where N+ is 1+ digits)
+            if [[ "$basename_file" =~ ^[0-9]+_.*\.sh$ ]]; then
+                modules+=("$basename_file")
+            fi
+        done < <(find "$PARTS_DIR" -name "[0-9]*_*.sh" -print0 | sort -z)
+    fi
     
     # Verify we found modules
     if [[ ${#modules[@]} -eq 0 ]]; then
         printf "%sERROR:%s No numbered modules found in %s\n" "$red" "$x" "$PARTS_DIR" >&2
-        printf "Expected pattern: NN_name.sh (e.g., 01_header.sh, 02_colors.sh)\n" >&2
+        if [[ "$USE_BUILD_MAP" != true ]]; then
+            printf "Expected pattern: NN_name.sh (e.g., 01_header.sh, 02_colors.sh)\n" >&2
+        fi
         exit 1
     fi
     
@@ -124,55 +276,54 @@ main() {
     printf "\n%s✓ Build complete!%s\n" "$green" "$x"
 }
 
-# Help function
+# Help function  
 usage() {
     cat << EOF
-build.sh - Assemble script from numbered modular parts
+build.sh - Assemble script from numbered modular parts (enhanced)
 
 USAGE:
   ./build.sh [OPTIONS]
 
 OPTIONS:
   -h, --help    Show this help
-  -o FILE       Output file (default: watchdom_fixed.sh)
+  -o FILE       Output file (default: padlock.sh)
   -p DIR        Parts directory (default: parts)
+  -m FILE       Build map file (default: build.map)
+  -r            Rename mode: rename source files according to build map
   -v            Verbose mode
   -c            Clean (remove output file before building)
   -l            List discovered modules and exit
 
 EXAMPLES:
   ./build.sh                           # Build with defaults
-  ./build.sh -o watchdom.sh            # Custom output name
-  ./build.sh -p modules -o watchdom    # Custom parts dir and output
+  ./build.sh -o taskdb.sh              # Custom output name
+  ./build.sh -p modules -o script      # Custom parts dir and output
+  ./build.sh -r                        # Rename source files using build.map
   ./build.sh -c                        # Clean build
   ./build.sh -l                        # List modules only
+
+BUILD MAP:
+  If build.map exists, it will be used to map source files to target names.
+  Format: NN : target_filename.sh
+  
+  Example build.map:
+    01 : 01_header.sh
+    02 : 02_config.sh
+    03 : 03_stderr.sh
+
+RENAME MODE (-r):
+  Renames downloaded artifacts (e.g., taskdb_part_01.sh) to proper 
+  numbered format (e.g., 01_header.sh) according to build.map.
 
 MODULE NAMING:
   Modules must follow pattern: NN_name.sh
   Where NN is 2+ digit number (e.g., 01, 02, 99, 100)
-  
-  Examples:
-    01_header.sh     ✓ Valid
-    02_colors.sh     ✓ Valid
-    99_footer.sh     ✓ Valid
-    100_extra.sh     ✓ Valid
-    1_bad.sh         ✗ Invalid (single digit)
-    header.sh        ✗ Invalid (no number)
-    01_header.txt    ✗ Invalid (not .sh)
-
-DIRECTORY STRUCTURE:
-  ./
-  ├── build.sh              # This script
-  └── parts/                # Module directory
-      ├── 01_header.sh
-      ├── 02_colors.sh
-      ├── ...
-      └── NN_footer.sh
 EOF
 }
 
 # Parse arguments
 list_only=false
+rename_only=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         (-h|--help)
@@ -188,6 +339,15 @@ while [[ $# -gt 0 ]]; do
             [[ $# -ge 2 ]] || { echo "ERROR: -p requires an argument" >&2; exit 1; }
             PARTS_DIR="$2"
             shift 2
+            ;;
+        (-m)
+            [[ $# -ge 2 ]] || { echo "ERROR: -m requires an argument" >&2; exit 1; }
+            BUILD_MAP="$2"
+            shift 2
+            ;;
+        (-r)
+            rename_only=true
+            shift
             ;;
         (-c)
             if [[ -f "$OUTPUT_FILE" ]]; then
@@ -212,23 +372,45 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Rename mode: just rename files and exit
+if [[ "$rename_only" == true ]]; then
+    if read_build_map; then
+        rename_from_build_map
+        printf "\n%s✓ Rename complete!%s\n" "$green" "$x"
+    else
+        printf "%sERROR:%s No valid build map found\n" "$red" "$x" >&2
+        exit 1
+    fi
+    exit 0
+fi
+
 # List mode: just show discovered modules
 if [[ "$list_only" == true ]]; then
     printf "%sDiscovering numbered modules in %s:%s\n\n" "$blue" "$PARTS_DIR" "$x"
+    
+    read_build_map || true  # Don't fail if no build map
     
     if [[ ! -d "$PARTS_DIR" ]]; then
         printf "%sERROR:%s Directory '%s' not found\n" "$red" "$x" "$PARTS_DIR" >&2
         exit 1
     fi
     
-    local modules=()
-    while IFS= read -r -d '' file; do
-        local basename_file
-        basename_file=$(basename "$file")
-        if [[ "$basename_file" =~ ^[0-9]{2,}_.*\.sh$ ]]; then
-            modules+=("$basename_file")
-        fi
-    done < <(find "$PARTS_DIR" -name "[0-9]*_*.sh" -print0 | sort -z)
+    modules=()
+    if [[ "$USE_BUILD_MAP" == true ]]; then
+        for num in $(printf '%s\n' "${!build_map_targets[@]}" | sort -n); do
+            target="${build_map_targets[$num]}"
+            if [[ -f "$PARTS_DIR/$target" ]]; then
+                modules+=("$target")
+            fi
+        done
+    else
+        while IFS= read -r -d '' file; do
+            basename_file=$(basename "$file")
+            if [[ "$basename_file" =~ ^[0-9]+_.*\.sh$ ]]; then
+                modules+=("$basename_file")
+            fi
+        done < <(find "$PARTS_DIR" -name "[0-9]*_*.sh" -print0 | sort -z)
+    fi
     
     if [[ ${#modules[@]} -eq 0 ]]; then
         printf "%sNo numbered modules found%s\n" "$yellow" "$x"

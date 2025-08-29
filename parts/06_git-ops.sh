@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #
 # semv-git-ops.sh - Git Operations and Repository Information
 # semv-revision: 2.0.0-dev_1
@@ -353,6 +352,26 @@ __git_fetch_tags() {
     fi
     
     return "$ret";
+}
+
+################################################################################
+#
+#  _latest_tag - Wrapper for do_latest_tag (compatibility)
+#
+################################################################################
+
+_latest_tag() {
+    do_latest_tag;
+}
+
+################################################################################
+#
+#  _is_git_repo - Check if current directory is a git repository
+#
+################################################################################
+
+_is_git_repo() {
+    git rev-parse --git-dir >/dev/null 2>&1;
 }
 
 # Mark git-ops as loaded (load guard pattern)

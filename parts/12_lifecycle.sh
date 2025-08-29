@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #
 # semv-lifecycle.sh - Installation and Lifecycle Management
 # semv-revision: 2.0.0-dev_1
