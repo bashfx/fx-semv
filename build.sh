@@ -286,7 +286,7 @@ USAGE:
 
 OPTIONS:
   -h, --help    Show this help
-  -o FILE       Output file (default: padlock.sh)
+  -o FILE       Output file (default: semv.sh)
   -p DIR        Parts directory (default: parts)
   -m FILE       Build map file (default: build.map)
   -r            Rename mode: rename source files according to build map

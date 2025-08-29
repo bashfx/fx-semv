@@ -1,7 +1,7 @@
 # SEMV - Semantic Version Manager
 
 **Version**: 2.0.0-dev_1  
-**Architecture**: BashFX v1.9 Compliant  
+**Architecture**: BashFX v3 Compliant  
 **Languages**: Rust, JavaScript, Python, Bash  
 
 A powerful semantic versioning automation tool that manages git tags, analyzes commit patterns, and synchronizes versions across multiple project formats. SEMV bridges the gap between git-based version control and package manager version requirements.
@@ -210,6 +210,11 @@ semv bc                 # Show current build count
 semv new                # Initialize repo with v0.0.1
 semv can                # Check if repo can use semver
 semv fetch              # Fetch remote tags
+semv mark1              # First-time baseline (from package or v0.0.1)
+semv audit              # Summarize repo/version state (non-destructive)
+semv remote             # Show latest remote semver tag
+semv upst               # Compare local vs remote semver tag
+semv rbc                # Compare local vs remote build counts
 ```
 
 ### Workflow Automation
@@ -247,11 +252,11 @@ semv status             # Show installation status
 
 ### XDG+ Compliant Directory Layout
 ```
-~/.local/fx/semv/           # Main installation
-├── semv.sh                 # Main script
-├── config/                 # Configuration files
-├── data/                   # Data and templates
+~/.local/etc/fx/semv/      # ETC (config)
 └── .semv.rc               # Session state file
+
+~/.local/lib/fx/semv/      # Library install (script location)
+└── semv.sh                # Main script
 
 ~/.local/bin/semv          # Symlink to main script
 ```
@@ -298,6 +303,9 @@ semv-dispatch.sh        # Command routing
 - **Stream Usage**: stderr for messages, stdout for capture
 - **XDG+ Paths**: All files in standard locations
 - **Predictable Variables**: `ret`, `res`, `path`, `curr`, etc.
+
+### Tests
+- See `README_TEST.md` for how to run and extend the test suite.
 
 ## 🐛 Troubleshooting
 
@@ -356,9 +364,9 @@ This project follows BashFX architecture standards and is part of the BashFX eco
 
 ## 📚 See Also
 
-- [BashFX Architecture Documentation](BASHFX.v.1.9.md)
-- [Command Reference](COMMANDS.md)
-- [Development Guide](DEVELOPMENT.md)
+- BashFX Architecture: docs/BASHFX-v3.md
+- Semv Command Reference: docs/semv_commands_reference.md
+- Semv Concepts: docs/semv_concepts.md
 
 ---
 

@@ -12,6 +12,36 @@
 
 ################################################################################
 #
+#  Tag Helpers
+#
+################################################################################
+
+__tag_delete() {
+    local tag="$1"
+    git tag -d "$tag" 2>/dev/null && trace "Removed existing '$tag' tag" || true
+}
+
+__retag_to() {
+    local tag="$1"; shift
+    local version="$1"; shift
+    local msg="$1"; shift || true
+    local obj
+    obj=$(git rev-list -n 1 "$version" 2>/dev/null) || obj=
+    if [[ -z "$obj" ]]; then
+        warn "Version not found for retag: $version"
+        return 1
+    fi
+    __tag_delete "$tag"
+    if git tag -a "$tag" -m "$msg" "$obj"; then
+        okay "Retagged '$tag' → $version"
+        return 0
+    fi
+    error "Failed to retag '$tag' to $version"
+    return 1
+}
+
+################################################################################
+#
 #  do_retag - Auto-retag special tags based on version state
 #
 ################################################################################
@@ -70,18 +100,7 @@ __retag_dev() {
     
     info "Retagging 'dev' to point to: $dev_version";
     
-    # Force-retag dev to current development version
-    if git tag -d "dev" 2>/dev/null; then
-        trace "Removed existing 'dev' tag";
-    fi
-    
-    if git tag -a "dev" -m "semv auto-retag: current development version"; then
-        okay "Retagged 'dev' → $dev_version";
-        return 0;
-    else
-        error "Failed to retag 'dev' to $dev_version";
-        return 1;
-    fi
+    __retag_to dev "$dev_version" "semv auto-retag: current development version"
 }
 
 ################################################################################
@@ -103,18 +122,7 @@ __retag_beta() {
         info "Removed 'dev' tag (exited dev mode)";
     fi
     
-    # Force-retag latest-dev to current beta version
-    if git tag -d "latest-dev" 2>/dev/null; then
-        trace "Removed existing 'latest-dev' tag";  
-    fi
-    
-    if git tag -a "latest-dev" -m "semv auto-retag: latest development version"; then
-        okay "Retagged 'latest-dev' → $beta_version";
-        return 0;
-    else
-        error "Failed to retag 'latest-dev' to $beta_version";
-        return 1;
-    fi
+    __retag_to latest-dev "$beta_version" "semv auto-retag: latest development version"
 }
 
 ################################################################################
@@ -152,7 +160,7 @@ __retag_stable() {
     
     # Create versioned stable snapshot
     local stable_snapshot="${stable_version}-stable";
-    if git tag -a "$stable_snapshot" -m "semv stable snapshot: reversion point"; then
+    if __retag_to "$stable_snapshot" "$stable_version" "semv stable snapshot: reversion point"; then
         okay "Created stable snapshot: $stable_snapshot";
     else
         warn "Failed to create stable snapshot tag";
@@ -168,15 +176,8 @@ __retag_stable() {
     fi
     
     # Force-retag latest to current stable version
-    if git tag -d "latest" 2>/dev/null; then
-        trace "Removed existing 'latest' tag";
-    fi
-    
-    if git tag -a "latest" -m "semv auto-retag: latest stable version"; then
-        okay "Retagged 'latest' → $stable_version";
-    else
-        error "Failed to retag 'latest' to $stable_version";
-        return 1;
+    if ! __retag_to latest "$stable_version" "semv auto-retag: latest stable version"; then
+        return 1
     fi
     
     return 0;
@@ -203,6 +204,10 @@ do_promote() {
     local version="${2:-}";
     local current_version;
     local ret=1;
+    
+    if ! require_semv_baseline; then
+        return 1
+    fi
     
     if [[ -z "$version" ]]; then
         current_version=$(_latest_tag);
@@ -263,8 +268,8 @@ do_promote_to_beta() {
         fi
     fi
     
-    # Create beta tag
-    if git tag -a "$beta_version" -m "semv promotion: $dev_version → beta"; then
+    # Create beta tag at the resolved dev commit (not implicit HEAD)
+    if __retag_to "$beta_version" "$dev_version" "semv promotion: $dev_version → beta"; then
         okay "Created beta version: $beta_version";
         __retag_beta "$beta_version";
         return 0;
@@ -307,8 +312,8 @@ do_promote_to_stable() {
         fi
     fi
     
-    # Create/retag stable version
-    if git tag -f -a "$stable_version" -m "semv promotion: $source_version → stable"; then
+    # Create/retag stable version at the resolved commit (not implicit HEAD)
+    if __retag_to "$stable_version" "$source_version" "semv promotion: $source_version → stable"; then
         okay "Created stable version: $stable_version";
         __retag_stable "$stable_version" "$source_version";
         return 0;
@@ -355,12 +360,8 @@ do_promote_to_release() {
         fi
     fi
     
-    # Force-retag release
-    if git tag -d "release" 2>/dev/null; then
-        trace "Removed existing 'release' tag";
-    fi
-    
-    if git tag -a "release" -m "semv promotion: $stable_version → public release"; then
+    # Force-retag release at the resolved commit (not implicit HEAD)
+    if __retag_to "release" "$stable_version" "semv promotion: $stable_version → public release"; then
         okay "Promoted to public release: $stable_version";
         return 0;
     else

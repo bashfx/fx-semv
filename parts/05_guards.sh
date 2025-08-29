@@ -122,6 +122,23 @@ is_force() {
 
 ################################################################################
 #
+#  require_semv_baseline - Ensure repo has a baseline semver tag
+#
+################################################################################
+# Returns: 0 if initialized, 1 otherwise (with guidance)
+
+require_semv_baseline() {
+    if has_semver; then
+        return 0
+    fi
+    error "Repository not initialized for semv (no semver tags)"
+    info "Run 'semv mark1' to establish a baseline from package version"
+    info "Or 'semv new' to create v0.0.1 if no package version exists"
+    return 1
+}
+
+################################################################################
+#
 #  Utility Guards
 #
 ################################################################################

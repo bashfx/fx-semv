@@ -128,11 +128,11 @@ __confirm() {
     
     __printf "${prompt}? > " "white2";
     
-    # Determine input source
-    if [[ -n "${BASH_SOURCE}" ]]; then
-        src="/dev/stdin";
-    else
+    # Determine input source: prefer tty when available
+    if [[ -t 0 ]] && [[ -r "/dev/tty" ]]; then
         src="/dev/tty";
+    else
+        src="/dev/stdin";
     fi
     
     while read -r -n 1 -s answer < "$src"; do

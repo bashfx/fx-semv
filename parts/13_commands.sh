@@ -104,19 +104,24 @@ _do_retag() {
     if __git_tag_create "$new_tag" "$note"; then
         info "Created tag: $new_tag";
         
-        # Push tags
-        if __git_push_tags "force"; then
-            okay "Pushed tags to remote";
-            
-            # Push commits if confirmed
-            if __confirm "Push commits for $new_tag and main to origin"; then
-                git push origin "$new_tag";
-                git push origin main;
-                okay "Pushed commits to remote";
+        # Push tags (only if a remote exists); local tagging still succeeds
+        if git remote get-url origin >/dev/null 2>&1; then
+            if __git_push_tags "force"; then
+                okay "Pushed tags to remote";
+                # Push commits if confirmed
+                if __confirm "Push commits for $new_tag and main to origin"; then
+                    git push origin "$new_tag";
+                    git push origin main;
+                    okay "Pushed commits to remote";
+                fi
+                ret=0;
+            else
+                warn "Failed to push tags to remote; local tag created";
+                ret=0;
             fi
-            ret=0;
         else
-            error "Failed to push tags";
+            info "No 'origin' remote configured; skipping push";
+            ret=0;
         fi
     else
         error "Failed to create tag";
@@ -225,6 +230,199 @@ do_info() {
     fi
     
     return 0;
+}
+
+################################################################################
+#
+#  do_build_count - Show current build count (commit count + floor)
+#
+################################################################################
+# Returns: 0 on success
+
+do_build_count() {
+    if ! is_repo; then
+        error "Not in a git repository";
+        return 1;
+    fi
+    __git_build_count;
+    return 0;
+}
+
+################################################################################
+#
+#  do_mark_1 - First-time registration (baseline tag)
+#
+################################################################################
+# Behavior:
+# - If semver tags already exist: report current latest and exit 0.
+# - If no tags: detect package version(s). If found, create sync tag at that version.
+#   Otherwise, default to v0.0.1.
+# Returns: 0 on success, 1 on failure
+
+do_mark_1() {
+    local project_types;
+    local pkg_version="";
+    local latest="";
+
+    if ! is_repo; then
+        error "Not in a git repository";
+        return 1;
+    fi
+
+    # Already initialized?
+    if has_semver; then
+        latest=$(do_latest_tag);
+        okay "Repository already initialized (latest: ${latest})";
+        return 0;
+    fi
+
+    # Detect project types and find package version baseline (highest)
+    if project_types=$(detect_project_type); then
+        pkg_version=$(_get_package_version "$project_types" 2>/dev/null || true)
+    fi
+
+    if [[ -n "$pkg_version" ]]; then
+        info "Initializing from package version: $pkg_version";
+        if __create_sync_tag "$pkg_version"; then
+            okay "Baseline created at v${pkg_version}";
+            return 0;
+        else
+            error "Failed to create baseline sync tag at v${pkg_version}";
+            return 1;
+        fi
+    else
+        info "No package version found; defaulting to v0.0.1";
+        if __git_tag_create "v0.0.1" "semv mark1: initial baseline"; then
+            okay "Baseline created at v0.0.1";
+            return 0;
+        else
+            error "Failed to create baseline tag v0.0.1";
+            return 1;
+        fi
+    fi
+}
+
+################################################################################
+#
+#  do_pre_commit - Pre-commit validation gate
+#
+################################################################################
+# Returns: 0 if validation passes, 1 if not
+
+do_pre_commit() {
+    local ret=0
+    if ! is_repo; then
+        error "Not in a git repository"
+        return 1
+    fi
+
+    info "Running pre-commit validation..."
+    if do_validate; then
+        okay "Pre-commit validation passed"
+        ret=0
+    else
+        error "Pre-commit validation failed"
+        warn "Run 'semv drift' and 'semv sync' to resolve version drift"
+        ret=1
+    fi
+    return "$ret"
+}
+
+################################################################################
+#
+#  do_audit - Summarize repository and version state (non-destructive)
+#
+################################################################################
+# Returns: 0 always
+
+do_audit() {
+    local types
+    local pkg_ver git_ver next_ver
+
+    if ! is_repo; then
+        error "Not in a git repository"
+        return 1
+    fi
+
+    info "SEM V Audit Report"
+    if types=$(detect_project_type); then
+        info "Detected: ${types}"
+        pkg_ver=$(_get_package_version "$types" 2>/dev/null || true)
+    else
+        warn "No supported project types detected"
+    fi
+    git_ver=$(_latest_tag 2>/dev/null || true)
+    next_ver=$(_calculate_semv_version 2>/dev/null || true)
+
+    printf "\nCurrent versions:\n" >&2
+    printf "  Package: %s\n" "${pkg_ver:-none}" >&2
+    printf "  Git tag: %s\n" "${git_ver:-none}" >&2
+    printf "  Next:    %s\n" "${next_ver:-n/a}" >&2
+
+    # Drift analysis (info only)
+    do_drift >/dev/null || true
+    return 0
+}
+
+################################################################################
+#
+#  do_latest_remote - Show latest remote semver tag (origin)
+#
+################################################################################
+# Returns: 0 on success, 1 on failure
+
+do_latest_remote() {
+    local out latest taglist
+    if ! is_repo; then error "Not in a git repository"; return 1; fi
+    info "Fetching remote tags..."
+    __git_fetch_tags >/dev/null 2>&1 || true
+    # Try ls-remote; fallback to local
+    if out=$(git ls-remote --tags origin 2>/dev/null); then
+        taglist=$(printf "%s\n" "$out" | awk '{print $2}' | sed 's@^refs/tags/@@' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V)
+        latest=$(printf "%s\n" "$taglist" | tail -1)
+        if [[ -n "$latest" ]]; then printf "%s\n" "$latest"; return 0; fi
+    fi
+    # Fallback to local latest
+    latest=$(do_latest_semver 2>/dev/null || true)
+    if [[ -n "$latest" ]]; then printf "%s\n" "$latest"; return 0; fi
+    return 1
+}
+
+################################################################################
+#
+#  do_remote_compare - Compare latest local vs remote semver tag
+#
+################################################################################
+# Returns: 0 on success (prints comparison), 1 on failure
+
+do_remote_compare() {
+    local local latest_remote
+    if ! is_repo; then error "Not in a git repository"; return 1; fi
+    local=$(do_latest_semver 2>/dev/null || true)
+    latest_remote=$(do_latest_remote 2>/dev/null || true)
+    if [[ -z "$local" && -z "$latest_remote" ]]; then
+        warn "No semver tags locally or remotely"
+        return 0
+    fi
+    printf "Local:  %s\n" "${local:-none}" >&2
+    printf "Remote: %s\n" "${latest_remote:-none}" >&2
+    return 0
+}
+
+################################################################################
+#
+#  do_rbuild_compare - Compare local vs remote build counts
+#
+################################################################################
+# Returns: 0 always
+
+do_rbuild_compare() {
+    local localb remoteb
+    if ! is_repo; then error "Not in a git repository"; return 1; fi
+    localb=$(__git_build_count)
+    remoteb=$(__git_remote_build_count)
+    printf "Build(local:remote) %s:%s\n" "$localb" "$remoteb" >&2
+    return 0
 }
 
 ################################################################################

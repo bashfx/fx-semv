@@ -15,11 +15,18 @@
 readonly SEMV_PATH="${BASH_SOURCE[0]}";
 readonly SEMV_EXEC="$0";
 
-# XDG+ Compliance paths
-readonly SEMV_HOME="${XDG_HOME:-$HOME/.local}/fx/semv";
-readonly SEMV_CONFIG="${XDG_ETC:-$HOME/.local/etc}/fx/semv";
-readonly SEMV_DATA="${XDG_DATA:-$HOME/.local/data}/fx/semv";
-readonly SEMV_RC="${SEMV_HOME}/.semv.rc";
+# XDG+ Compliance paths (canonical *_HOME variables)
+readonly SEMV_ETC_HOME="${XDG_ETC:-$HOME/.local/etc}/fx/semv";
+readonly SEMV_DATA_HOME="${XDG_DATA:-$HOME/.local/data}/fx/semv";
+readonly SEMV_LIB_HOME="${XDG_LIB:-$HOME/.local/lib}/fx/semv";
+
+# Back-compatibility aliases
+readonly SEMV_CONFIG="$SEMV_ETC_HOME";   # legacy naming
+readonly SEMV_ETC="$SEMV_ETC_HOME";      # transitional alias
+readonly SEMV_DATA="$SEMV_DATA_HOME";    # legacy naming
+
+# RC file under ETC
+readonly SEMV_RC="${SEMV_ETC_HOME}/.semv.rc";
 
 # Commit message label conventions
 readonly SEMV_MAJ_LABEL="brk";    # Breaking changes -> Major bump
@@ -40,17 +47,18 @@ export TERM=xterm-256color;
 ################################################################################
 
 # Standard BashFX flag variables (set by options())
-opt_debug=0;       # 0=disabled, 1=enabled (default off)
-opt_trace=0;       # 0=disabled, 1=enabled (default off)  
-opt_quiet=0;       # 0=disabled, 1=enabled (default off - show messages)
-opt_force=0;       # 0=disabled, 1=enabled (default off)
-opt_yes=0;         # 0=disabled, 1=enabled (default off)
-opt_dev=0;         # 0=disabled, 1=enabled (default off)
+opt_debug=0;       # 0=enabled, 1=disabled (default off=1)
+opt_trace=0;       # 0=enabled, 1=disabled (default off=1)  
+opt_quiet=0;       # 0=enabled, 1=disabled (default off=1 - show messages)
+opt_force=0;       # 0=enabled, 1=disabled (default off=1)
+opt_yes=0;         # 0=enabled, 1=disabled (default off=1)
+opt_dev=0;         # 0=enabled, 1=disabled (default off=1)
 
 # SEMV-specific option states
-opt_dev_note=1;    # 0=enabled, 1=disabled (default off)
-opt_build_dir=1;   # 0=enabled, 1=disabled (default off)
-opt_no_cursor=1;   # 0=enabled, 1=disabled (default off)
+opt_dev_note=1;    # 0=enabled, 1=disabled (default off=1)
+opt_build_dir=1;   # 0=enabled, 1=disabled (default off=1)
+opt_no_cursor=1;   # 0=enabled, 1=disabled (default off=1)
+opt_auto=0;        # 0=enabled (auto-mode default on to avoid prompts), 1=disabled
 
 ################################################################################
 #
@@ -63,13 +71,29 @@ if [[ "${NO_BUILD_CURSOR:-}" == "1" ]] || [[ "${NO_BUILD_CURSOR:-}" == "true" ]]
     opt_no_cursor=0;
 fi
 
-# Support QUIET_MODE, DEBUG_MODE from BashFX standards
-if [[ "${QUIET_MODE:-}" == "1" ]] || [[ "${QUIET_MODE:-}" == "true" ]]; then
-    opt_quiet=0;
+# Support QUIET_MODE, DEBUG_MODE, TRACE_MODE from BashFX standards (0=true)
+if [[ -n "${QUIET_MODE+x}" ]]; then
+    if [[ "${QUIET_MODE}" == "0" || "${QUIET_MODE}" == "true" ]]; then
+        opt_quiet=0;
+    else
+        opt_quiet=1;
+    fi
 fi
 
-if [[ "${DEBUG_MODE:-}" == "1" ]] || [[ "${DEBUG_MODE:-}" == "true" ]]; then
-    opt_debug=0;
+if [[ -n "${DEBUG_MODE+x}" ]]; then
+    if [[ "${DEBUG_MODE}" == "0" || "${DEBUG_MODE}" == "true" ]]; then
+        opt_debug=0;
+    else
+        opt_debug=1;
+    fi
+fi
+
+if [[ -n "${TRACE_MODE+x}" ]]; then
+    if [[ "${TRACE_MODE}" == "0" || "${TRACE_MODE}" == "true" ]]; then
+        opt_trace=0;
+    else
+        opt_trace=1;
+    fi
 fi
 
 ################################################################################
@@ -83,18 +107,14 @@ fi
 _ensure_xdg_paths() {
     local ret=1;
     
-    if [[ ! -d "$SEMV_HOME" ]]; then
-        mkdir -p "$SEMV_HOME" 2>/dev/null && ret=0;
-    else
-        ret=0;
+    ret=0;
+    # Ensure ETC/DATA exist
+    if [[ ! -d "$SEMV_ETC_HOME" ]]; then
+        mkdir -p "$SEMV_ETC_HOME" 2>/dev/null || ret=1;
     fi
     
-    if [[ ! -d "$SEMV_CONFIG" ]]; then
-        mkdir -p "$SEMV_CONFIG" 2>/dev/null || ret=1;
-    fi
-    
-    if [[ ! -d "$SEMV_DATA" ]]; then
-        mkdir -p "$SEMV_DATA" 2>/dev/null || ret=1;
+    if [[ ! -d "$SEMV_DATA_HOME" ]]; then
+        mkdir -p "$SEMV_DATA_HOME" 2>/dev/null || ret=1;
     fi
     
     return "$ret";

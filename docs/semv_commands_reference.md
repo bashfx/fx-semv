@@ -177,10 +177,23 @@ semv can                # Validate semver readiness
 semv new                # Create initial v0.0.1 tag
 ```
 
+### `semv mark1`
+**First-time registration (baseline)**
+```bash
+semv mark1              # Create sync tag from package version, or v0.0.1 if none
+```
+
 ### `semv fetch`
 **Fetch remote tags**
 ```bash
 semv fetch              # Update local tags from remote
+```
+
+### Remote operations
+```bash
+semv remote             # Show latest remote semver tag (origin)
+semv upst               # Compare local vs remote semver tag
+semv rbc                # Compare local vs remote build counts
 ```
 
 ## Workflow Integration
@@ -319,7 +332,7 @@ semv bump major                   # Runs major hook after tagging
 ### Breaking Changes in v2.0
 1. **Commit Labels Changed**: `feat:` now means minor (was major), `brk:` removed  
 2. **New Commands**: `get`, `set`, `sync`, `promote`, `hook` command families added
-3. **Tag Retagging**: Automatic retagging of `dev`, `latest-dev`, `latest`, `release`
+3. **Tag Retagging**: Automatic retagging of `dev`, `latest-dev`, `latest`, `release` (tags point to the resolved commit for the specified version; no implicit HEAD tagging)
 4. **Patch Behavior**: Patch bumps are manual only, no auto-tagging
 
 ### Migration Steps
@@ -344,6 +357,11 @@ echo '# semv-version: 1.0.0' >> my-script.sh  # Bash
 # Check what's out of sync
 semv drift
 # Auto-resolve
+### `semv bc`
+**Show current build count (commit count + floor)**
+```bash
+semv bc                   # Prints numeric build count
+```
 semv sync
 ```
 
@@ -357,3 +375,14 @@ semv sync
 ---
 
 **SEMV v2.0** - Production-ready semantic versioning with intelligent conflict resolution
+### `semv pre-commit`
+**Validate before committing**
+```bash
+semv pre-commit         # Fails when validation fails (e.g., drift)
+```
+
+### `semv audit`
+**Summarize repository and version state**
+```bash
+semv audit              # Non-destructive audit of current state
+```

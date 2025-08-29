@@ -230,8 +230,13 @@ __git_tag_delete() {
     local ret=1;
     
     if [[ -n "$tag" ]]; then
-        git tag -d "$tag";
-        ret=$?;
+        if declare -F __tag_delete >/dev/null 2>&1; then
+            __tag_delete "$tag";
+            ret=$?;
+        else
+            git tag -d "$tag";
+            ret=$?;
+        fi
     fi
     
     return "$ret";
@@ -295,11 +300,40 @@ __git_build_count() {
 # Outputs: Remote build number to stdout
 
 __git_remote_build_count() {
-    local count;
-    
-    count=$(git rev-list origin/main --count 2>/dev/null || echo 0);
-    count=$((count + SEMV_MIN_BUILD));
-    echo "$count";
+    local branch="";
+    local ref="";
+    local count_raw
+    local count
+
+    # Determine remote default branch using origin/HEAD if available
+    branch=$(which_main 2>/dev/null || true)
+
+    # Fallback: parse git remote show origin
+    if [[ -z "$branch" ]]; then
+        branch=$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p' | head -1)
+    fi
+
+    # Fallbacks to common names if remote HEAD not discoverable
+    if [[ -z "$branch" ]]; then
+        if git show-ref --verify --quiet refs/remotes/origin/main; then
+            branch="main"
+        elif git show-ref --verify --quiet refs/remotes/origin/master; then
+            branch="master"
+        else
+            branch=""
+        fi
+    fi
+
+    if [[ -n "$branch" ]]; then
+        ref="origin/${branch}"
+        count_raw=$(git rev-list "$ref" --count 2>/dev/null || echo 0)
+    else
+        count_raw=0
+    fi
+
+    # Normalize numeric and add floor
+    count=$(( ${count_raw:-0} + SEMV_MIN_BUILD ))
+    echo "$count"
     return 0;
 }
 

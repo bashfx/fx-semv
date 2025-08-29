@@ -61,6 +61,14 @@ options() {
             --no-cursor)
                 opt_no_cursor=0;
                 ;;
+            --auto)
+                # Enable automation mode (silence ceremonies/prompts)
+                opt_auto=0;
+                ;;
+            --no-auto)
+                # Disable automation mode (allow ceremonies/prompts)
+                opt_auto=1;
+                ;;
             -*)
                 error "Invalid flag [$this]";
                 ret=1;

@@ -37,6 +37,8 @@ resolve_version_conflicts() {
     # Get versions from different sources
     package_version=$(_get_package_version "$project_types");
     git_version=$(_latest_tag);
+    # Normalize git version to number (strip leading 'v') for comparison
+    local git_version_num="${git_version#v}"
     semv_version=$(_calculate_semv_version);
     
     trace "Package version: ${package_version:-none}";
@@ -519,6 +521,8 @@ do_drift() {
     package_version=$(_get_package_version "$project_types");
     git_version=$(_latest_tag);
     semv_version=$(_calculate_semv_version);
+    # Normalize git version to numeric (strip leading 'v') for comparisons
+    local git_version_num="${git_version#v}"
     
     # Display current state
     printf "\n%s=== Version Source Analysis ===%s\n" "$bld" "$x" >&2;
@@ -526,14 +530,19 @@ do_drift() {
     printf "  Git latest tag:  %s\n" "${git_version:-none}" >&2;
     printf "  Calculated next: %s\n" "${semv_version:-none}" >&2;
     
-    # Analyze drift
-    if [[ "$package_version" != "$git_version" ]] || [[ "$git_version" != "$semv_version" ]]; then
+    # Analyze drift using current sources only (package vs current tag)
+    if [[ -n "$package_version" ]] && [[ -n "$git_version_num" ]] && [[ "$package_version" != "$git_version_num" ]]; then
         printf "\n%s⚠️  VERSION DRIFT DETECTED%s\n" "$orange" "$x" >&2;
         printf "Sources are not aligned. Run 'semv sync' to resolve.\n" >&2;
-        ret=0;
+        ret=0; # drift
     else
-        printf "\n%s✓ All version sources are aligned%s\n" "$green" "$x" >&2;
-        ret=1;
+        # No drift if only one source present or both equal
+        printf "\n%s✓ Current sources are aligned%s\n" "$green" "$x" >&2;
+        # If no tags found but package exists, report baseline info
+        if [[ -z "$git_version" ]] && [[ -n "$package_version" ]]; then
+            info "No git tags found; using package version as baseline";
+        fi
+        ret=1; # aligned
     fi
     
     return "$ret";
@@ -553,13 +562,17 @@ do_validate() {
     
     info "Validating project version consistency...";
     
-    # Check project structure
+    # Check project structure (non-fatal if tags exist)
     if ! detect_project_type >/dev/null; then
-        error "Project structure validation failed";
-        ((issues++));
+        if has_semver; then
+            warn "No supported package files detected; using tags as authority"
+        else
+            error "Project structure validation failed"
+            ((issues++))
+        fi
     fi
     
-    # Check for version conflicts
+    # Check for version conflicts (do_drift returns 0 on drift, 1 on aligned)
     if do_drift >/dev/null 2>&1; then
         warn "Version drift detected between sources";
         ((issues++));
@@ -571,11 +584,10 @@ do_validate() {
         ((issues++));
     fi
     
-    # Check for uncommitted changes
+    # Check for uncommitted changes (warn only; not a validation failure)
     if ! is_not_staged; then
         warn "Uncommitted changes detected";
         info "Consider committing changes before version operations";
-        ((issues++));
     fi
     
     # Report results

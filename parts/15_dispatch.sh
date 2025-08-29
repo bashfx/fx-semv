@@ -22,7 +22,7 @@ dispatch() {
     local ret=0;
     local func_name="";
     
-    shift; # Remove command from args
+    if [[ $# -gt 0 ]]; then shift; fi # Remove command from args if present
     
     case "$cmd" in
         # Version Operations
@@ -109,7 +109,9 @@ dispatch() {
     if [[ -n "$func_name" ]]; then
         if function_exists "$func_name"; then
             trace "Dispatching: $cmd -> $func_name";
-            shift; shift; # Remove first two args, leaving only the parameters for the command
+            # Remove first two args if present, leaving only the parameters for the command
+            if [[ $# -gt 0 ]]; then shift; fi
+            if [[ $# -gt 0 ]]; then shift; fi
             "$func_name" "$arg" "$arg2" "$@";
             ret=$?;
         else
@@ -154,10 +156,19 @@ ${bld}BUILD OPERATIONS:${x}
     ${green}file${x}              Generate build info file
     ${green}bc${x}                Show current build count
 
+${bld}REMOTE:${x}
+    ${green}remote${x}            Show latest remote semver tag
+    ${green}upst${x}              Compare local vs remote semver
+    ${green}rbc${x}               Compare local vs remote build counts
+
 ${bld}REPOSITORY MANAGEMENT:${x}
     ${green}new${x}               Initialize repo with v0.0.1
     ${green}can${x}               Check if repo can use semver
     ${green}fetch${x}             Fetch remote tags
+
+${bld}WORKFLOW:${x}
+    ${green}pre-commit${x}        Validate before committing
+    ${green}audit${x}             Summarize repo/version state
 
 ${bld}VERSION GET/SET:${x}
     ${green}get all${x}           Show all detected version sources
