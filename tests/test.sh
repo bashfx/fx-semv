@@ -115,4 +115,4 @@ main() {
   return $rc
 }
 
-main "$@"
+main "$@"; exit $?

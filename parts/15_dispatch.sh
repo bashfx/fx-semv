@@ -182,18 +182,20 @@ ${bld}SYNCHRONIZATION:${x}
     ${green}sync${x}              Auto-detect and sync all sources
 
 ${bld}FLAGS:${x}
-    ${yellow}-d${x}                Enable debug messages
-    ${yellow}-t${x}                Enable trace messages  
-    ${yellow}-q${x}                Quiet mode (errors only)
-    ${yellow}-f${x}                Force operations
-    ${yellow}-y${x}                Auto-answer yes to prompts
-    ${yellow}-D${x}                Master dev flag (enables -d, -t)
+    ${yellow}-d, --debug${x}        Enable debug messages
+    ${yellow}-t, --trace${x}        Enable trace messages  
+    ${yellow}-q, --quiet${x}        Quiet mode (errors only)
+    ${yellow}-f, --force${x}        Force operations
+    ${yellow}-y, --yes${x}          Auto-answer yes to prompts
+    ${yellow}-D, --dev${x}          Master dev flag (enables -d, -t)
+    ${yellow}-N, --dev-note${x}     Add dev/build suffix to next version
+        --auto / --no-auto         Automation mode (silence prompts) / restore prompts
 
 ${bld}COMMIT LABELS:${x}
-    ${orange}brk:${x}              Breaking changes → Major bump
-    ${orange}feat:${x}             New features → Minor bump
-    ${orange}fix:${x}              Bug fixes → Patch bump
-    ${orange}dev:${x}              Development notes → Dev build
+    ${orange}major|breaking|api:${x}  Major changes → Major bump
+    ${orange}feat|feature|add|minor:${x}  New features → Minor bump
+    ${orange}fix|patch|bug|hotfix|up:${x}  Fixes/docs → Patch bump
+    ${orange}dev:${x}                Development notes → Dev build
 
 ${bld}EXAMPLES:${x}
     semv                  # Show current version

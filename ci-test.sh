@@ -24,10 +24,15 @@ fi
 fail=0
 run_one() {
   local path="$1"
-  local base
+  local base rc
   base="$(basename "$path")"
   echo "[ci] running: $base"
-  if ! ./tests/test.sh run "$base"; then
+  set +e
+  ./tests/test.sh run "$base"
+  rc=$?
+  set -e
+  if [[ $rc -ne 0 ]]; then
+    echo "[ci] fail: $base (rc=$rc)" >&2
     fail=1
   fi
 }
@@ -47,6 +52,7 @@ fi
 if [[ $fail -ne 0 ]]; then
   echo "[ci] FAIL: one or more tests failed" >&2
   exit 1
+else
+  echo "[ci] PASS"
+  exit 0
 fi
-echo "[ci] PASS"
-

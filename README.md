@@ -91,16 +91,16 @@ semv validate
 semv drift
 ```
 
-## 📝 Commit Message Conventions
+## 📝 Commit Message Conventions (SEMV v2.0)
 
-SEMV uses commit message prefixes to determine version bumps:
+SEMV determines version bumps from commit message prefixes (colon suffix required):
 
-| Prefix | Impact | Version Change | Example |
-|--------|--------|----------------|---------|
-| `brk:` | Breaking Change | Major (x.0.0) | `brk: remove deprecated API` |
-| `feat:` | New Feature | Minor (x.y.0) | `feat: add user authentication` |
-| `fix:` | Bug Fix | Patch (x.y.z) | `fix: handle null pointer exception` |
-| `dev:` | Development Note | Dev Build | `dev: refactor validation logic` |
+| Prefixes | Impact | Version Change | Example |
+|----------|--------|----------------|---------|
+| `major:` `breaking:` `api:` | Major change | Major (x.0.0) | `breaking: remove deprecated API` |
+| `feat:` `feature:` `add:` `minor:` | New features | Minor (x.y.0) | `feat: add user authentication` |
+| `fix:` `patch:` `bug:` `hotfix:` `up:` | Fixes/docs | Patch (x.y.z) | `fix: handle null pointer exception` |
+| `dev:` | Development note | Dev Build | `dev: refactor validation logic` |
 
 ### Example Workflow
 ```bash

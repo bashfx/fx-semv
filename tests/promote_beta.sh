@@ -28,8 +28,8 @@ git config user.email "test@example.com"
 echo "x" > f.txt
 git add f.txt
 git commit -qm "feat: init"
-
-# Create a dev tag to promote from
+# Create a baseline semver tag and a dev tag to promote from
+git tag -a v0.1.0 -m "baseline"
 git tag -a v0.1.1-dev_1 -m "dev state"
 
 # Promote specified dev version to beta
@@ -48,4 +48,3 @@ popd >/dev/null
 fx_clean_tmp promote_beta_repo
 
 test_end
-

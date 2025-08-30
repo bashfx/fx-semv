@@ -29,10 +29,15 @@ readonly SEMV_DATA="$SEMV_DATA_HOME";    # legacy naming
 readonly SEMV_RC="${SEMV_ETC_HOME}/.semv.rc";
 
 # Commit message label conventions
-readonly SEMV_MAJ_LABEL="brk";    # Breaking changes -> Major bump
-readonly SEMV_FEAT_LABEL="feat";  # New features -> Minor bump  
-readonly SEMV_FIX_LABEL="fix";    # Bug fixes -> Patch bump
-readonly SEMV_DEV_LABEL="dev";    # Development notes -> Dev build
+# Commit label scheme (SEMV v2.0)
+# Major:    major, breaking, api
+# Minor:    feat, feature, add, minor
+# Patch:    fix, patch, bug, hotfix, up
+# Dev:      dev
+readonly SEMV_MAJ_LABEL="(major|breaking|api)";
+readonly SEMV_FEAT_LABEL="(feat|feature|add|minor)";  
+readonly SEMV_FIX_LABEL="(fix|patch|bug|hotfix|up)";
+readonly SEMV_DEV_LABEL="dev";
 
 # Build system constants
 readonly SEMV_MIN_BUILD=1000;     # Minimum build number floor

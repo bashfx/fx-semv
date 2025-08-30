@@ -218,6 +218,22 @@ Next queued tasks (per TASKS.md):
 - Rebuilt script; syntax health green.
 - Next: M9 add tests for `promote beta` and `promote release` with snapshot/retag assertions.
 
+## 2025-08-29 — M9 Promotion Coverage + M14 Label Scheme
+
+- Promotion tagging hardened to use resolved commits for beta/stable/release.
+- Added tests: `tests/promote_beta.sh`, `tests/promote_release.sh`.
+- Label scheme aligned to SEMV v2.0 (major/breaking/api; feat/feature/add/minor; fix/patch/bug/hotfix/up; dev).
+- Updated help surfaces (`usage()`, `semv lbl`) and README commit conventions.
+- Added small patch-bump test: `tests/patch_bump_label.sh`.
+- Rebuilt and syntax health green; pending targeted runs if environment has gitsim.
+
+## 2025-08-29 — Wrap-up & Cleanup
+
+- Updated usage/help to include new flags and v2.0 label scheme.
+- Synced README commit conventions to v2.0.
+- Cleaned ephemeral repo artifacts: removed `tests/tmp/` folder (test fallback now uses `./tmp/tests`).
+- Rebuilt final script; syntax health remains green.
+
 - Reviewed guards/printers; no behavior changes needed; consolidated tag operations already implemented via helpers.
 - Updated command reference to clarify retagging uses resolved commit objects (no implicit HEAD).
 

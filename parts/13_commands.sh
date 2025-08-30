@@ -30,6 +30,11 @@ do_bump() {
         error "Not in a git repository";
         return 1;
     fi
+
+    # Ensure repository has a semv baseline for friendlier guidance
+    if ! require_semv_baseline; then
+        return 1;
+    fi
     
     # Get current and next versions
     latest=$(do_latest_tag);
@@ -610,10 +615,10 @@ do_label_help() {
     local msg="";
     
     msg+="~~ SEMV Commit Labels ~~\n";
-    msg+="${spark} ${green}brk:${x}  -> Breaking changes [Major]\n";
-    msg+="${spark} ${green}feat:${x} -> New features [Minor]\n";
-    msg+="${spark} ${green}fix:${x}  -> Bug fixes [Patch]\n";
-    msg+="${spark} ${green}dev:${x}  -> Development notes [Dev Build]\n";
+    msg+="${spark} ${green}major|breaking|api:${x}   -> Major changes [Major]\n";
+    msg+="${spark} ${green}feat|feature|add|minor:${x} -> Features [Minor]\n";
+    msg+="${spark} ${green}fix|patch|bug|hotfix|up:${x} -> Fixes/docs [Patch]\n";
+    msg+="${spark} ${green}dev:${x}                   -> Development notes [Dev Build]\n";
     
     printf "%b\n" "$msg" >&2;
     return 0;

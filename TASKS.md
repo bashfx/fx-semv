@@ -46,8 +46,8 @@ Point scale: 1 (tiny), 2 (small), 3 (medium), 5 (large). Focus on low‑risk, hi
 - [ ] Add `--auto` flag parsing and default `opt_auto` state (preserve current auto-mode) (2)
 
 ## M9 — Promotion Coverage
-- [ ] Add tests for `promote beta` and `promote release` (3)
-  - [ ] Verify `latest` retagging, `vX.Y.Z-stable` snapshot creation, and `release` tagging (2)
+- [x] Add tests for `promote beta` and `promote release` (3)
+  - [x] Verify `latest` retagging, `vX.Y.Z-stable` snapshot creation, and `release` tagging (2)
 
 ## M10 — Remote Robustness
 - [x] Use `which_main` (or remote HEAD) for remote build count (3)
@@ -71,3 +71,10 @@ Point scale: 1 (tiny), 2 (small), 3 (medium), 5 (large). Focus on low‑risk, hi
 - [x] Implement `do_rbuild_compare` (build counts local vs remote) (2)
 - [x] Add tests for each new command (5)
 - [x] Verify `validate` semantics in fresh repo (should succeed when in sync) (2)
+
+## M14 — Label Scheme Alignment (SEMV v2.0)
+- [x] Implement multi-label regex for bump detection: major `(major|breaking|api)`, minor `(feat|feature|add|minor)`, patch `(fix|patch|bug|hotfix|up)`, dev `dev` (2)
+- [x] Update `usage()` COMMIT LABELS section (1)
+- [x] Update `semv lbl` output to new scheme (1)
+- [x] Update README commit conventions to v2.0 (1)
+- [ ] Add a tiny test that a `fix:` commit triggers patch bump in `do_next_semver` path (2)

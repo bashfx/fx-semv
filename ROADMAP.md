@@ -80,3 +80,9 @@ This roadmap reflects the near-term path to align SEMV with BashFX v3 architectu
 
 ## Milestone 13: Pre‑commit Auto Staging (Optional)
 - Offer to stage version files when drift resolved or changes detected (document clearly).
+
+## Milestone 14: Label Scheme Alignment (SEMV v2.0)
+- Implement multi-label patterns for bump detection (major/minor/patch/dev) in code.
+- Update help surfaces (`usage()`, `lbl`) to reflect new scheme.
+- Align README commit conventions to v2.0.
+- Confirm existing tests (feat → minor) still pass; add a smoke for a patch label (e.g., `up:`) if needed.

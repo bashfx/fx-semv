@@ -282,10 +282,10 @@ __create_default_config() {
 # SEMV Configuration File
 # semv-revision: 2.0.0-dev_1
 
-# Commit label configuration
-SEMV_MAJ_LABEL="brk"
-SEMV_FEAT_LABEL="feat"
-SEMV_FIX_LABEL="fix"
+# Commit label configuration (SEMV v2.0)
+SEMV_MAJ_LABEL="(major|breaking|api)"
+SEMV_FEAT_LABEL="(feat|feature|add|minor)"
+SEMV_FIX_LABEL="(fix|patch|bug|hotfix|up)"
 SEMV_DEV_LABEL="dev"
 
 # Build configuration

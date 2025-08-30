@@ -99,7 +99,7 @@ do_change_count() {
     build_s=$(__git_build_count);
     note_s="$dev_count";
     
-    trace "Changes since $tag: brk=$break_count feat=$feat_count fix=$fix_count dev=$dev_count";
+    trace "Changes since $tag: major=$break_count minor=$feat_count patch=$fix_count dev=$dev_count";
     
     # Determine version bump based on commit types
     if [[ "$break_count" -ne 0 ]]; then
