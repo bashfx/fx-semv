@@ -1,5 +1,7 @@
 # SEMV Command Reference
 
+DEPRECATION NOTICE: This reference may be out of date. Prefer `README.md` for current usage and `semv.sh` `usage()` output. Planning/status lives in `ROADMAP.md` and `TASKS.md`.
+
 **Version**: 2.0.0-production  
 **Updated**: 2025-08-26  
 **Complete command documentation for SEMV v2.0**

@@ -31,18 +31,24 @@ This roadmap reflects the near-term path to align SEMV with BashFX v3 architectu
 - Decide whether to keep direct mapping (safer) or introduce derived mappings with hardened guards.
 
 ## Milestone 7: Command Surface Completion
-- Implement legacy‑standard commands that the dispatcher maps but are not yet implemented.
+- Implement dispatcher‑mapped commands and align help/docs with code.
 - Add targeted tests that assert expected behavior and outputs.
 - Keep scope tight and leverage existing helpers to avoid duplicate logic.
 
-### Included Commands
-- Build Count: `do_build_count` (thin wrapper over `__git_build_count`)
-- Mark 1: `do_mark_1` (init repo, create v0.0.1 when appropriate)
-- Pre‑Commit: `do_pre_commit` (validate sync; optionally stage version files)
-- Audit: `do_audit` (summarize repo/version state; non‑destructive)
-- Remote Latest: `do_latest_remote` (show latest remote semver tag)
-- Remote Compare: `do_remote_compare` (local vs remote semver drift)
-- Remote Build Compare: `do_rbuild_compare` (compare build counts local vs remote)
+### Command Surface Status
+- [x] Build Count: `do_build_count` (via `__git_build_count`)
+- [x] Mark 1: `do_mark_1` (baseline tag from packages or v0.0.1)
+- [x] Pre‑Commit: `do_pre_commit` (validate sync; guard drift)
+- [x] Audit: `do_audit` (summarize repo/version state; non‑destructive)
+- [x] Remote Latest: `do_latest_remote`
+- [x] Remote Compare: `do_remote_compare`
+- [x] Remote Build Compare: `do_rbuild_compare` (CLI: `rbc`)
+- [x] Can: `do_can_semver` (add lightweight readiness checks)
+- [x] Release: `do_release` (wrapper around `promote release`)
+- [x] Snip: removed from dispatch (deprecated)
+- [x] Auto: `do_auto` (implement minimal mode)
+- [x] Alias: map `bcr` → `do_rbuild_compare` (compat wrapper)
+- [x] Docs: align README “sync TYPE” examples (global sync)
 
 ### Out of scope for M7
 - Push operations and network side‑effects (unless trivial and safe)
@@ -53,18 +59,18 @@ This roadmap reflects the near-term path to align SEMV with BashFX v3 architectu
 - Networked/CI integration work beyond basic local validation.
 
 ## Milestone 8: Baseline + Validate/Drift Hardening
-- Guard any remaining semv‑aware flows that require a baseline (ensure guidance to `mark1`/`new`).
-- Add edge‑case tests for validate/drift (no tags + package; tags only; aligned state).
-- Fix drift analysis bug: define `git_version_num` inside `do_drift()`.
-- Add explicit `--auto` option; preserve current default auto-mode for non-interactive flows.
+- [x] Guard semv‑aware flows that require a baseline (bump/promote guard; `baseline_guard.sh`)
+- [x] Edge‑case tests for validate/drift (no tags + package; tags only; aligned state)
+- [x] Fix drift analysis bug: define `git_version_num` inside `do_drift()`
+- [x] Add explicit `--auto/--no-auto` option; preserve current default auto‑mode
 
 ## Milestone 9: Promotion Coverage
-- Add tests for `promote beta` and `promote release` to verify retag behavior and snapshots.
+- [x] Tests for `promote beta` and `promote release` (retag behavior and snapshots)
   - Verify `latest` retagging, `vX.Y.Z-stable` snapshot creation, and `release` pointing at the resolved commit.
 
 ## Milestone 10: Remote Robustness
-- Use `which_main` (or remote HEAD) to determine remote default branch for build count.
-- Add a test that doesn’t assume `origin/main` exists.
+- [x] Use `which_main` (or remote HEAD) for remote default branch
+- [x] Test for non‑`main` default (e.g., `trunk`) via `remote_head_build_count.sh`
 
 ## Meta: IX Protocol Alignment
 - Maintain IX loop: roadmap → tasks → SESSION.md log per change.
@@ -72,17 +78,17 @@ This roadmap reflects the near-term path to align SEMV with BashFX v3 architectu
 - Prefer safe, reversible fixes before refactors; RFC before invasive changes.
 
 ## Milestone 11: Multi‑Language Sync Tests
-- Create a mixed project (rust/js/python) and assert sync + validate behaviors.
+- [x] Create a mixed project (rust/js/python) and assert sync + validate behaviors.
 
 ## Milestone 12: Dispatcher Hybrid Mapping (Flagged)
-- Implement hybrid mapping behind a feature flag; default to explicit mapping.
-- Add opt‑in test to validate mapping behavior.
+- [x] Implement hybrid mapping behind a feature flag (`SEMV_FEATURE_HYBRID=1`); default remains explicit mapping.
+- [x] Add opt‑in test (`tests/hybrid_dispatch_optin.sh`).
 
 ## Milestone 13: Pre‑commit Auto Staging (Optional)
-- Offer to stage version files when drift resolved or changes detected (document clearly).
+- [x] Offer to stage version files when aligned (flag: --stage) and document usage.
 
 ## Milestone 14: Label Scheme Alignment (SEMV v2.0)
-- Implement multi-label patterns for bump detection (major/minor/patch/dev) in code.
-- Update help surfaces (`usage()`, `lbl`) to reflect new scheme.
-- Align README commit conventions to v2.0.
-- Confirm existing tests (feat → minor) still pass; add a smoke for a patch label (e.g., `up:`) if needed.
+- [x] Implement multi‑label patterns for bump detection (major/minor/patch/dev)
+- [x] Update help surfaces (`usage()`, `lbl`) to reflect new scheme
+- [x] Align README commit conventions to v2.0
+- [x] Add a smoke test: a `fix:` commit triggers patch bump in `do_next_semver`

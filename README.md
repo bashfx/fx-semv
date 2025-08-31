@@ -78,11 +78,8 @@ semv info
 # Auto-detect and sync all sources
 semv sync
 
-# Sync specific project type
-semv sync rust      # Cargo.toml
-semv sync js        # package.json  
-semv sync python    # pyproject.toml
-semv sync bash      # Script metadata
+# Sync all detected sources
+semv sync           # Auto-detect and synchronize versions
 
 # Check sync status
 semv validate
@@ -154,20 +151,22 @@ export DEBUG_MODE=1
 ```
 
 ### Configuration File
-Located at `~/.local/etc/fx/semv/config`:
+Located at `~/.local/etc/fx/semv/config` (aka `$SEMV_ETC_HOME/config`):
 ```bash
-# Commit label configuration
-SEMV_MAJ_LABEL="brk"
-SEMV_FEAT_LABEL="feat"
-SEMV_FIX_LABEL="fix"
+# Commit label configuration (SEMV v2.0)
+SEMV_MAJ_LABEL="(major|breaking|api)"
+SEMV_FEAT_LABEL="(feat|feature|add|minor)"
+SEMV_FIX_LABEL="(fix|patch|bug|hotfix|up)"
 SEMV_DEV_LABEL="dev"
 
 # Build configuration
 SEMV_MIN_BUILD=1000
 
-# Default options
-DEFAULT_DEBUG=1
-DEFAULT_NO_CURSOR=1
+# Environment overrides (0=true)
+NO_BUILD_CURSOR=
+QUIET_MODE=
+DEBUG_MODE=
+TRACE_MODE=
 ```
 
 ## 🎛️ Command Reference
@@ -191,10 +190,7 @@ semv status             # Show working directory status
 ### Synchronization
 ```bash
 semv sync               # Auto-detect and sync all sources
-semv sync rust          # Sync with Cargo.toml
-semv sync js            # Sync with package.json
-semv sync python        # Sync with pyproject.toml
-semv sync bash          # Sync with script metadata
+semv sync               # Auto-detect and synchronize versions
 semv validate           # Check all sources are in sync
 semv drift              # Show version mismatches
 ```
@@ -221,6 +217,20 @@ semv rbc                # Compare local vs remote build counts
 ```bash
 semv pre-commit         # Pre-commit validation hook
 semv release            # Full release workflow
+semv auto <path> <cmd>  # Run a command in auto-mode (no prompts)
+semv pre-commit --stage # Validate and stage version files if aligned
+```
+
+### Automation Examples
+```bash
+# Run bump non-interactively in current repo
+semv auto . bump -y
+
+# Resolve sync non-interactively in another repo path
+semv auto ./some/repo sync
+
+# Validate (no prompts) from a CI script
+semv auto . validate
 ```
 
 ### Lifecycle Management
@@ -228,7 +238,6 @@ semv release            # Full release workflow
 semv install            # Install to BashFX system
 semv uninstall          # Remove from system
 semv reset              # Reset configuration
-semv status             # Show installation status
 ```
 
 ## 🚩 Flags
@@ -260,6 +269,25 @@ semv status             # Show installation status
 
 ~/.local/bin/semv          # Symlink to main script
 ```
+
+Canonical variables:
+- `SEMV_ETC_HOME` → `~/.local/etc/fx/semv`
+- `SEMV_DATA_HOME` → `~/.local/data/fx/semv`
+- `SEMV_LIB_HOME` → `~/.local/lib/fx/semv`
+
+## 📚 Docs Index
+- Active:
+  - ROADMAP: `ROADMAP.md`
+  - Tasks: `TASKS.md`
+  - Test Guide: `README_TEST.md`
+  - BashFX Architecture: `docs/BASHFX-v3.md`
+- Archived/Legacy (may be outdated):
+  - `docs/semv_commands_reference.md` (deprecated notice at top)
+  - `docs/archive/` (historical notes like `SESSION-2025-08-29.md`)
+
+## ⚙️ Advanced
+- Hybrid dispatch (opt‑in): set `SEMV_FEATURE_HYBRID=1` to allow unmapped commands to call `do_<cmd>` if defined. Example: `SEMV_FEATURE_HYBRID=1 semv install-status` maps to `do_install_status`.
+- Safe confirm (opt‑in): set `SEMV_SAFE_CONFIRM=1` to require typing `yes` (full word + Enter) at confirmation prompts; default remains single‑key confirm.
 
 ### Build Cursor Format
 ```bash
@@ -297,6 +325,10 @@ semv-sync-commands.sh   # Sync orchestration
 semv-sync-integration.sh # Workflow integration
 semv-dispatch.sh        # Command routing
 ```
+
+### Build Script
+- `./build.sh` assembles `semv.sh` from `parts/` and runs a syntax check.
+- `./build.sh -r` will rename parts according to `parts/build.map`, and clean numbered artifacts not present in the map. Use with care; it assumes intentional renames and a versioned history for safety.
 
 ### BashFX Compliance
 - **Function Ordinality**: `do_*` (high-order), `_*` (helpers), `__*` (literals)

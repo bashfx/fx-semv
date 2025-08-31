@@ -5,16 +5,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-if [[ -x ./build.sh ]]; then
-  ./build.sh -c >/dev/null
-  ./build.sh >/dev/null
+if [[ -x ../build.sh ]]; then
+  (cd .. && ./build.sh -c >/dev/null && ./build.sh >/dev/null)
 fi
 
 echo "[ci] syntax health"
-./tests/test.sh health
+(cd .. && ./test.sh health)
 
 echo "[ci] discovering tests"
-mapfile -t TESTS < <(./tests/test.sh list | sed 's/^• \s*//')
+mapfile -t TESTS < <(cd .. && ./test.sh list | sed 's/^• \s*//')
 
 have_gitsim=0
 if command -v gitsim >/dev/null 2>&1; then
@@ -28,7 +27,7 @@ run_one() {
   base="$(basename "$path")"
   echo "[ci] running: $base"
   set +e
-  ./tests/test.sh run "$base"
+  (cd .. && ./test.sh run "$base")
   rc=$?
   set -e
   if [[ $rc -ne 0 ]]; then

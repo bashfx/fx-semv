@@ -38,12 +38,28 @@ Point scale: 1 (tiny), 2 (small), 3 (medium), 5 (large). Focus on low‑risk, hi
 - [x] RFC: dispatcher lazy‑vars refactor plan (3)
 
 ## M7 — Command Surface Completion
+// Consolidated from dispatcher review and prior work
+- [x] Implement `do_build_count` via `__git_build_count` (1)
+- [x] Implement `do_mark_1` (init repo; create v0.0.1 if none) (3)
+- [x] Implement `do_pre_commit` (validate sync; stage optional later) (3)
+- [x] Implement `do_audit` (summarize repo/version state; non‑destructive) (2)
+- [x] Implement `do_latest_remote` (fetch remote; latest semver tag) (3)
+- [x] Implement `do_remote_compare` (local vs remote semver drift) (3)
+- [x] Implement `do_rbuild_compare` (build counts local vs remote) (2)
+- [x] Implement `do_can_semver` readiness checks (2)
+- [x] Implement `do_release` as wrapper around `promote release` (3)
+- [x] Remove deprecated `snip` from dispatch (2)
+- [x] Implement `do_auto` minimal behavior or hide flag (2)
+- [x] Map `bcr` alias to `do_rbuild_compare` (compat wrapper) (1)
+- [x] Docs: align README sync examples (type‑aware) or implement type routing (2)
+- [x] Docs: update README_TEST to use `./test.sh`; remove “bc unimplemented” note (1)
+- [x] Code hygiene: dedupe duplicate `do_status` definition (1)
 
 ## M8 — Baseline + Validate/Drift Hardening
-- [ ] Guard any remaining semv‑aware flows (baseline guidance) (2)
-- [ ] Add validate/drift edge tests: no tags + package; tags only; aligned (3)
-- [ ] Fix drift bug: define `git_version_num` inside `do_drift()` (1)
-- [ ] Add `--auto` flag parsing and default `opt_auto` state (preserve current auto-mode) (2)
+- [x] Guard semv‑aware flows (bump/promote baseline requirement) (2)
+- [x] Add validate/drift edge tests: no tags + package; tags only; aligned (3)
+- [x] Fix drift bug: define `git_version_num` inside `do_drift()` (1)
+- [x] Add `--auto` flag parsing and default `opt_auto` state (preserve current auto‑mode) (2)
 
 ## M9 — Promotion Coverage
 - [x] Add tests for `promote beta` and `promote release` (3)
@@ -54,27 +70,27 @@ Point scale: 1 (tiny), 2 (small), 3 (medium), 5 (large). Focus on low‑risk, hi
 - [x] Add test that doesn’t assume `origin/main` exists (2)
 
 ## M11 — Multi‑Language Sync Tests
-- [ ] Mixed project sync + validate test (rust/js/python) (5)
+- [x] Mixed project sync + validate test (rust/js/python) (5)
 
 ## M12 — Dispatcher Hybrid Mapping (Flagged)
-- [ ] Implement hybrid mapping behind feature flag (5)
-- [ ] Opt‑in mapping test (2)
+- [x] Implement hybrid mapping behind feature flag (5)
+- [x] Opt‑in mapping test (2)
 
 ## M13 — Pre‑commit Auto Staging (Optional)
-- [ ] Add optional staging path in pre‑commit (prompt + flag) (3)
-- [x] Implement `do_build_count` via `__git_build_count` (1)
-- [x] Implement `do_mark_1` (init repo; create v0.0.1 if none) (3)
-- [x] Implement `do_pre_commit` (validate sync; stage version files optionally) (3)
-- [x] Implement `do_audit` (summarize repo/version state; non‑destructive) (2)
-- [x] Implement `do_latest_remote` (fetch remote; latest semver tag) (3)
-- [x] Implement `do_remote_compare` (local vs remote semver drift) (3)
-- [x] Implement `do_rbuild_compare` (build counts local vs remote) (2)
-- [x] Add tests for each new command (5)
-- [x] Verify `validate` semantics in fresh repo (should succeed when in sync) (2)
+- [x] Add optional staging path in pre‑commit (flag: --stage) (3)
 
 ## M14 — Label Scheme Alignment (SEMV v2.0)
-- [x] Implement multi-label regex for bump detection: major `(major|breaking|api)`, minor `(feat|feature|add|minor)`, patch `(fix|patch|bug|hotfix|up)`, dev `dev` (2)
+- [x] Implement multi‑label regex for bump detection: major `(major|breaking|api)`, minor `(feat|feature|add|minor)`, patch `(fix|patch|bug|hotfix|up)`, dev `dev` (2)
 - [x] Update `usage()` COMMIT LABELS section (1)
 - [x] Update `semv lbl` output to new scheme (1)
 - [x] Update README commit conventions to v2.0 (1)
-- [ ] Add a tiny test that a `fix:` commit triggers patch bump in `do_next_semver` path (2)
+- [x] Add a tiny test that a `fix:` commit triggers patch bump in `do_next_semver` path (2)
+
+## M15 — Hygiene + Conventions
+- [x] Confirm semantics: added optional `_safe_confirm` (env: `SEMV_SAFE_CONFIRM=1`); pseudo‑tty test TBD (3)
+- [x] Options semantics: 0=true flags and QUIET/DEBUG/TRACE docs aligned (2)
+- [x] XDG+ naming: document canonical `*_HOME` variables in README (2)
+- [ ] Cleanup stale comments (SEM V HOME migration, etc.) (1)
+- [ ] Shellcheck/shift‑guard hygiene pass (no behavior change) (3)
+- [x] Remove/avoid `DEFAULT_*` options in docs (2)
+- [x] Document `build.sh -r` behavior and risks in README (1)

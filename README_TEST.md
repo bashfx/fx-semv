@@ -8,7 +8,7 @@ This document explains how to run the test suite, what each test covers, and how
   - `tests/lib/ceremony.sh`: Standardized start/pass/fail/end output.
   - `tests/lib/assert.sh`: Assertions (`assert_exit`, `assert_match`) with ANSI‑stripping for stable matching.
   - `tests/lib/env.sh`: Project root detection, XDG cache paths, and safe tmp directory fallback.
-- Dispatcher: `tests/test.sh`
+- Dispatcher: `test.sh`
   - `list` — list test files
   - `health` — syntax check for all tests (`bash -n`)
   - `run [pattern]` — run all or matching tests
@@ -16,15 +16,15 @@ This document explains how to run the test suite, what each test covers, and how
 ## Running Tests
 
 - List tests:
-  - `./tests/test.sh list`
+  - `./test.sh list`
 - Syntax health:
-  - `./tests/test.sh health`
+  - `./test.sh health`
 - Run all tests:
-  - `./tests/test.sh run`
+  - `./test.sh run`
 - Run a specific test by filename pattern:
-  - `./tests/test.sh run test_simple.sh`
+  - `./test.sh run test_simple.sh`
 - Minimal CI helper (optional):
-  - `./ci-test.sh` (runs `health` + executes tests; skips gitsim tests if `gitsim` is missing)
+  - `./tests/ci-test.sh` (runs `health` + executes tests; skips gitsim tests if `gitsim` is missing)
 
 ## Environment
 
@@ -46,8 +46,8 @@ This document explains how to run the test suite, what each test covers, and how
 
 - `tests/comprehensive_test.sh`
   - Purpose: A broader surface pass of key commands.
-  - Coverage: `help`, `next`, `info`, `status`, `get bash`, `get all`, and `bc` (build count) if implemented.
-  - Behavior: Treats missing `bc` as a skipped (non‑fatal) case.
+  - Coverage: `help`, `next`, `info`, `status`, `get bash`, `get all`, and `bc` (build count).
+  - Notes: `bc` is implemented via `do_build_count`.
 
 - `tests/test_git_sim.sh`
   - Purpose: Verify `gitsim` availability and minimal operations.
@@ -89,11 +89,10 @@ This document explains how to run the test suite, what each test covers, and how
 ## Practical Examples
 
 - Run a single test:
-  - `./tests/test.sh run test_simple.sh`
+  - `./test.sh run test_simple.sh`
 - Run only tests matching a pattern:
-  - `./tests/test.sh run integration`
+  - `./test.sh run integration`
 - CI helper locally:
-  - `./ci-test.sh`
+  - `./tests/ci-test.sh`
 
 This harness balances visual ceremony for manual runs with pragmatic assertions for automation. Extend coverage by following the pattern above; prefer small, focused tests and use the integration test for end‑to‑end flows.
-

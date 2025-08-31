@@ -50,8 +50,8 @@ discover_tests() {
   if [[ -d test ]]; then
     while IFS= read -r -d '' f; do files+=("$f"); done < <(find test -maxdepth 1 -type f -name "*.sh" -perm -u+x -print0)
   fi
-  # Filter out the dispatcher itself to avoid recursion
-  printf '%s\n' "${files[@]}" | rg -v '^tests/test\.sh$' | sort
+  # Filter out dispatcher and CI helper to avoid recursion
+  printf '%s\n' "${files[@]}" | rg -v '^(tests/)?test\.sh$|^tests/ci-test\.sh$' | sort
 }
 
 run_test_file() {
@@ -106,7 +106,13 @@ main() {
 
   local pass=0 fail=0
   for t in "${tests[@]}"; do
-    if run_test_file "$t"; then ((pass++)); else ((fail++)); rc=1; fi
+    if run_test_file "$t"; then
+      # Avoid non-zero status from arithmetic with errexit
+      pass=$((pass + 1))
+    else
+      fail=$((fail + 1))
+      rc=1
+    fi
   done
 
   if [[ $opt_quiet -ne 0 ]]; then

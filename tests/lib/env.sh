@@ -19,16 +19,11 @@ done
 FX_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
 fx_tmp_dir() {
-  # Per-test temp dir under XDG cache; fallback to project-local tmp if cache unwritable
+  # Use project-local tmp dir for stability in sandboxed environments
   local name="$1"
-  local p="$FX_CACHE_HOME/tmp/$(basename "$PROJECT_ROOT")/tests/$name"
-  if mkdir -p "$p" 2>/dev/null; then
-    printf "%s\n" "$p"
-  else
-    p="$PROJECT_ROOT/tmp/tests/$name"
-    mkdir -p "$p"
-    printf "%s\n" "$p"
-  fi
+  local p="$PROJECT_ROOT/tmp/tests/$name"
+  mkdir -p "$p"
+  printf "%s\n" "$p"
 }
 
 fx_clean_tmp() {
