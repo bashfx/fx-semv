@@ -1,6 +1,6 @@
 #
 # semv-commands.sh - High-Order Command Functions
-# semv-revision: 2.0.0-dev_1
+# semv-revision: 2.0.0
 # BashFX compliant command implementations
 #
 
@@ -594,12 +594,22 @@ do_tags() {
 # Returns: 0 always
 
 do_inspect() {
-    info "Available functions:";
-    declare -F | grep 'do_' | awk '{print $3}' >&2;
+    info "Available SEMV functions:";
+    func ls "$SEMV_PATH" 2>/dev/null | grep "^do_" | sort >&2;
     
-    info "Dispatch mappings:";
-    # This would show the dispatch table if implemented
-    info "(Dispatch table inspection not implemented yet)";
+    info "";
+    info "Dispatch table commands:";
+    info "Version: latest, next, bump";
+    info "Analysis: info, pending, changes, since, status";
+    info "Build: file, bc, bcr";
+    info "Repo: new, can, fetch, tags";
+    info "Remote: remote, upstream, rbc";
+    info "Sync: get, set, sync, validate, drift";
+    info "Workflow: pre-commit, release, audit";
+    info "Lifecycle: install, uninstall, reset";
+    info "Promotion: promote";
+    info "Hooks: hook";
+    info "Dev: inspect, labels, auto";
     
     return 0;
 }
@@ -641,12 +651,29 @@ do_label_help() {
 # Returns: Command-specific return code
 
 do_auto() {
-    local path="$1";
-    local cmd="$2";
+    local action="${1:-sync}";
+    shift || true;
     
-    # Placeholder for auto mode implementation
-    error "Auto mode not implemented yet";
-    return 1;
+    trace "Auto mode: $action";
+    
+    case "$action" in
+        sync)
+            info "Auto-sync: Running version synchronization";
+            do_sync "$@";
+            ;;
+        validate)
+            info "Auto-validate: Running version validation";
+            do_validate "$@";
+            ;;
+        drift)
+            info "Auto-drift: Running drift analysis";
+            do_drift "$@";
+            ;;
+        *)
+            info "Auto mode (default): Running sync";
+            do_sync "$action" "$@";
+            ;;
+    esac
 }
 
 ################################################################################

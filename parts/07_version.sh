@@ -1,6 +1,6 @@
 #
 # semv-version.sh - Version Parsing and Comparison Logic
-# semv-revision: 2.0.0-dev_1
+# semv-revision: 2.0.0
 # BashFX compliant version handling with proper stream usage
 #
 

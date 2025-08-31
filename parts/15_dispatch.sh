@@ -1,6 +1,6 @@
 #
 # semv-dispatch.sh - Command Routing and Main Interface
-# semv-revision: 2.0.0-dev_1
+# semv-revision: 2.0.0
 # BashFX compliant dispatch and main functions
 #
 
@@ -47,7 +47,6 @@ dispatch() {
         can)               func_name="do_can_semver";;
         fetch)             func_name="do_fetch_tags";;
         tags)              func_name="do_tags";;
-        snip)              func_name="do_snip";;
         
         # Version Validation
         test)              func_name="do_test_semver";;

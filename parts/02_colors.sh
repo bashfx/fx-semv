@@ -1,6 +1,6 @@
 #
 # semv-colors.sh - Color and Glyph Definitions  
-# semv-revision: 2.0.0-dev_1
+# semv-revision: 2.0.0
 # BashFX compliant color module using esc.sh standards
 #
 

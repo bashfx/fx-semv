@@ -1,6 +1,6 @@
 #
 # 09_resolve.sh - Version Resolution and Conflict Handling
-# semv-revision: 2.0.0-dev_1
+# semv-revision: 2.0.0
 # Part of SEMV - Semantic Version Manager
 #
 

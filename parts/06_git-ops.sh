@@ -1,6 +1,6 @@
 #
 # semv-git-ops.sh - Git Operations and Repository Information
-# semv-revision: 2.0.0-dev_1
+# semv-revision: 2.0.0
 # BashFX compliant git operations module
 #
 

@@ -1,6 +1,6 @@
 #
 # semv-options.sh - Flag Parsing and Options
-# semv-revision: 2.0.0-dev_1
+# semv-revision: 2.0.0
 # BashFX compliant options module
 #
 

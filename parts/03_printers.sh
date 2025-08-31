@@ -1,8 +1,34 @@
 #
 # semv-printers.sh - Output and Printing Functions
-# semv-revision: 2.0.0-dev_1 
+# semv-revision: 2.0.0 
 # BashFX compliant printer module with predictable variables
 #
+
+################################################################################
+#
+#  Boxy Integration (Optional Enhancement)
+#
+################################################################################
+
+# Boxy wrapper for enhanced visual output
+boxy_msg() {
+    local theme="$1";
+    local message="$2";
+    shift 2;
+    
+    if [[ "$SEMV_USE_BOXY" == "1" ]] && command_exists boxy; then
+        echo "$message" | boxy --theme "$theme" "$@";
+    else
+        # Fallback to standard messaging
+        case "$theme" in
+            success) okay "$message" ;;
+            error) error "$message" ;;
+            warn) warn "$message" ;;
+            info) info "$message" ;;
+            *) info "$message" ;;
+        esac
+    fi
+}
 
 ################################################################################
 #

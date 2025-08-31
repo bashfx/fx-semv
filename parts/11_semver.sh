@@ -1,6 +1,6 @@
 #
 # semv-semver.sh - Core Semantic Versioning Business Logic
-# semv-revision: 2.0.0-dev_1
+# semv-revision: 2.0.0
 # BashFX compliant semver operations
 #
 

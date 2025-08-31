@@ -1,0 +1,45 @@
+# BOXY Themes Reference
+# Quick reference for boxy theme system integration with TaskDB
+# Usage: echo "message" | boxy --theme <theme_name>
+
+# SYSTEM STATUS THEMES
+fatal     💀 red2    - System crashes, critical failures
+error     ❌ red     - Build failures, validation errors  
+warn      ⚠️  orange  - Warnings, cautions, advisories
+success   ✅ green   - Successful operations, completions
+info      ℹ️  blue2   - Informational messages, status updates
+
+# DEVELOPMENT THEMES  
+debug     🐛 grey    - Debug output, troubleshooting info
+trace     👣 grey2   - Detailed execution traces
+dev       🪛 cyan    - Development tools, utilities
+new       ✨ green2  - New features, creations, additions
+lab       🧪 cyan    - Experimental features, testing
+
+# WORKFLOW THEMES
+blocked   🚧 orange  - Blocked tasks, impediments
+help      💡 blue2   - Help messages, guidance
+think     💭 cyan    - Planning, considerations
+notif     📣 green   - Notifications, announcements
+
+# SECURITY THEMES
+lock      🔒 grey2   - Secured, protected resources
+unlock    🔓 green   - Access granted, unlocked features  
+key       🔑 orange  - Authentication, credentials
+
+# SPECIAL THEMES
+magic     🌈 purple2 - Special effects, transformations
+silly     🪀 purple  - Fun messages, lighthearted content
+oops      👻 purple  - Minor mistakes, recoverable errors
+lore      🪬 grey    - Knowledge, documentation, wisdom
+
+# THEME SYNTAX
+# Basic:     echo "Build complete" | boxy --theme success
+# Override:  echo "Custom" | boxy --theme error --color blue --icon "🚀"
+# Combined:  echo "Deploy" | boxy --theme success --title "Status" --footer "v1.0"
+
+# TASKDB INTEGRATION IDEAS
+# Task states: success (DONE), warn (BLOCKED), error (FAILED), info (INPR)
+# Build output: success/error for build results
+# Status updates: info for general status, notif for important updates
+# Debug mode: debug/trace for verbose output

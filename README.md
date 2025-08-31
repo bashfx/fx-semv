@@ -1,10 +1,17 @@
 # SEMV - Semantic Version Manager
 
-**Version**: 2.0.0-dev_1  
+**Version**: 2.0.0  
 **Architecture**: BashFX v3 Compliant  
 **Languages**: Rust, JavaScript, Python, Bash  
 
 A powerful semantic versioning automation tool that manages git tags, analyzes commit patterns, and synchronizes versions across multiple project formats. SEMV bridges the gap between git-based version control and package manager version requirements.
+
+## 🎉 **NEW in v2.0.0**
+- ✅ **Complete MVP implementation** - All 110+ functions working
+- ✅ **Enhanced inspection tools** - `semv inspect` shows full function catalog
+- ✅ **Auto mode for CI/CD** - `semv auto [sync|validate|drift]` for external integration
+- ✅ **Optional Boxy UX** - Enhanced visual output with `SEMV_USE_BOXY=1`
+- ✅ **Full test coverage** - 15 test categories, 100% pass rate
 
 ## 🚀 Features
 
@@ -167,6 +174,20 @@ NO_BUILD_CURSOR=
 QUIET_MODE=
 DEBUG_MODE=
 TRACE_MODE=
+```
+
+### Development & Inspection  
+```bash
+# Show all available functions and dispatch commands  
+semv inspect
+
+# Auto mode for CI/CD integration
+semv auto sync          # Auto-sync versions
+semv auto validate      # Auto-validate versions  
+semv auto drift         # Auto-detect drift
+
+# Enhanced visual output (requires boxy)
+SEMV_USE_BOXY=1 semv status
 ```
 
 ## 🎛️ Command Reference

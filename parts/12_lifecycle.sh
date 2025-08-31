@@ -1,6 +1,6 @@
 #
 # semv-lifecycle.sh - Installation and Lifecycle Management
-# semv-revision: 2.0.0-dev_1
+# semv-revision: 2.0.0
 # BashFX compliant lifecycle functions
 #
 
@@ -280,7 +280,7 @@ __create_default_config() {
     # Create main configuration file
     cat > "$config_file" << 'EOF'
 # SEMV Configuration File
-# semv-revision: 2.0.0-dev_1
+# semv-revision: 2.0.0
 
 # Commit label configuration (SEMV v2.0)
 SEMV_MAJ_LABEL="(major|breaking|api)"
@@ -328,11 +328,11 @@ __create_rc_file() {
     cat > "$SEMV_RC" << EOF
 # SEMV Session State
 # Generated: $(date)
-# semv-revision: 2.0.0-dev_1
+# semv-revision: 2.0.0
 
 SEMV_INSTALLED=1
 SEMV_INSTALL_DATE=$(date +%s)
-SEMV_VERSION=2.0.0-dev_1
+SEMV_VERSION=2.0.0
 SEMV_ETC_HOME=$SEMV_ETC_HOME
 SEMV_CONFIG=$SEMV_CONFIG
 SEMV_DATA_HOME=$SEMV_DATA_HOME

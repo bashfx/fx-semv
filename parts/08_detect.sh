@@ -1,6 +1,6 @@
 #
 # 08_detect.sh - Project Type Detection and Validation
-# semv-revision: 2.0.0-dev_1
+# semv-revision: 2.0.0
 # Part of SEMV - Semantic Version Manager
 #
 
