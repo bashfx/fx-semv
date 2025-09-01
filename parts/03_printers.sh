@@ -228,5 +228,16 @@ identify() {
     fi
 }
 
+################################################################################
+#
+#  View Mode Detection
+#
+################################################################################
+
+get_view_mode() {
+    local mode="${opt_view:-simple}";
+    [[ "$mode" =~ ^(data|simple|full)$ ]] && echo "$mode" || echo "simple";
+}
+
 # Mark printers as loaded (load guard pattern)
 readonly SEMV_PRINTERS_LOADED=1;

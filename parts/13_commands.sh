@@ -343,6 +343,7 @@ do_pre_commit() {
 do_audit() {
     local types
     local pkg_ver git_ver next_ver
+    local final_result
 
     if ! is_repo; then
         error "Not in a git repository"
@@ -359,10 +360,15 @@ do_audit() {
     git_ver=$(_latest_tag 2>/dev/null || true)
     next_ver=$(_calculate_semv_version 2>/dev/null || true)
 
-    printf "\nCurrent versions:\n" >&2
-    printf "  Package: %s\n" "${pkg_ver:-none}" >&2
-    printf "  Git tag: %s\n" "${git_ver:-none}" >&2
-    printf "  Next:    %s\n" "${next_ver:-n/a}" >&2
+    # Build final result
+    final_result=$(printf "\nCurrent versions:\n  Package: %s\n  Git tag: %s\n  Next:    %s\n" "${pkg_ver:-none}" "${git_ver:-none}" "${next_ver:-n/a}")
+
+    # Output with optional boxy wrapper
+    if [[ "$SEMV_USE_BOXY" == "1" ]] && command_exists boxy; then
+        echo "$final_result" | boxy --theme info --title "🔍 Audit Report"
+    else
+        echo "$final_result" >&2
+    fi
 
     # Drift analysis (info only)
     do_drift >/dev/null || true
@@ -519,6 +525,7 @@ do_last() {
 
 do_status() {
     local count;
+    local final_result;
     
     if ! is_repo; then
         error "Not in a git repository";
@@ -526,7 +533,14 @@ do_status() {
     fi
     
     count=$(__git_status_count);
-    printf "%d\n" "$count";
+    final_result="$count"
+    
+    # Output with optional boxy wrapper
+    if [[ "$SEMV_USE_BOXY" == "1" ]] && command_exists boxy; then
+        echo "$final_result" | boxy --theme info --title "📊 Git Status Count"
+    else
+        echo "$final_result"
+    fi
     
     if [[ "$count" -gt 0 ]]; then
         return 0;
@@ -674,6 +688,71 @@ do_auto() {
             do_sync "$action" "$@";
             ;;
     esac
+}
+
+################################################################################
+#
+#  do_can_semver - Check if repository is ready for semantic versioning
+#
+################################################################################
+# Returns: 0 if ready, 1 if not ready
+
+do_can_semver() {
+    local ret=0;
+    local issues=0;
+    
+    info "Checking semver readiness...";
+    
+    # Check 1: Is this a git repository?
+    if ! _is_git_repo; then
+        error "Not in a git repository";
+        ((issues++));
+    else
+        okay "✓ Git repository detected";
+    fi
+    
+    # Check 2: Does it have any commits?
+    if ! git rev-parse HEAD >/dev/null 2>&1; then
+        error "No commits found";
+        ((issues++));
+    else
+        okay "✓ Repository has commits";
+    fi
+    
+    # Check 3: Does it have semver tags?
+    if has_semver; then
+        okay "✓ Semver tags found";
+    else
+        warn "No semver tags found (use 'semv new' to initialize)";
+    fi
+    
+    # Check 4: Are there uncommitted changes?
+    if is_not_staged; then
+        okay "✓ Working tree is clean";
+    else
+        warn "Uncommitted changes detected";
+        info "Consider committing before version operations";
+    fi
+    
+    # Check 5: Can we detect project type?
+    if detect_project_type >/dev/null 2>&1; then
+        okay "✓ Project type detected";
+    else
+        warn "No supported package files found";
+        info "Semv will use git tags as authority";
+    fi
+    
+    # Report results
+    if [[ "$issues" -eq 0 ]]; then
+        okay "Repository is ready for semantic versioning";
+        ret=0;
+    else
+        error "Repository is not ready for semantic versioning";
+        info "Fix the issues above and try again";
+        ret=1;
+    fi
+    
+    return "$ret";
 }
 
 ################################################################################

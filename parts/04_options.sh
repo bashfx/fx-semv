@@ -69,6 +69,19 @@ options() {
                 # Disable automation mode (allow ceremonies/prompts)
                 opt_auto=1;
                 ;;
+            --view=*)
+                # Set view mode (data/simple/full)
+                opt_view="${this#*=}";
+                ;;
+            --view)
+                # Set view mode with next argument
+                if [[ -n "$next" ]] && [[ ! "$next" =~ ^- ]]; then
+                    opt_view="$next";
+                    ((i++));
+                else
+                    opt_view="simple";
+                fi
+                ;;
             -*)
                 error "Invalid flag [$this]";
                 ret=1;

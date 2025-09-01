@@ -53,7 +53,7 @@ export TERM=xterm-256color;
 
 # Standard BashFX flag variables (set by options())
 opt_debug=0;       # 0=enabled, 1=disabled (default off=1)
-opt_trace=0;       # 0=enabled, 1=disabled (default off=1)  
+opt_trace=1;       # 0=enabled, 1=disabled (default off=1)  
 opt_quiet=0;       # 0=enabled, 1=disabled (default off=1 - show messages)
 opt_force=0;       # 0=enabled, 1=disabled (default off=1)
 opt_yes=0;         # 0=enabled, 1=disabled (default off=1)

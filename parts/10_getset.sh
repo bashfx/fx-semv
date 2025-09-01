@@ -32,7 +32,7 @@ do_get() {
         rust|cargo)
             version=$(get_rust_version);
             if [[ -n "$version" ]]; then
-                printf "rust: %s\n" "$version";
+                printf "rust (Cargo.toml): %s\n" "$version";
                 ret=0;
             else
                 error "No Rust version found (Cargo.toml missing or invalid)";
@@ -41,7 +41,7 @@ do_get() {
         js|javascript|node|npm)
             version=$(get_javascript_version);
             if [[ -n "$version" ]]; then
-                printf "javascript: %s\n" "$version";
+                printf "javascript (package.json): %s\n" "$version";
                 ret=0;
             else
                 error "No JavaScript version found (package.json missing or invalid)";
@@ -50,7 +50,7 @@ do_get() {
         python|py)
             version=$(get_python_version);
             if [[ -n "$version" ]]; then
-                printf "python: %s\n" "$version";
+                printf "python (pyproject.toml/setup.py): %s\n" "$version";
                 ret=0;
             else
                 error "No Python version found (pyproject.toml/setup.py missing or invalid)";
@@ -103,31 +103,35 @@ do_get_all() {
     local project_types;
     local git_version;
     local semv_version;
+    local output;
     
     info "Scanning all version sources...";
-    printf "\n";
+    
+    # Build output while tracking if we found anything
+    output=""
+    output+="\n"
     
     # Package file versions
-    printf "%s=== Package Files ===%s\n" "$bld" "$x";
+    output+="\n${bld}=== Package Files ===${x}\n"
     
     # Rust
     version=$(get_rust_version 2>/dev/null);
     if [[ -n "$version" ]]; then
-        printf "  rust (Cargo.toml): %s\n" "$version";
+        output+="  rust (Cargo.toml): ${version}\n"
         found_any=1;
     fi
     
     # JavaScript  
     version=$(get_javascript_version 2>/dev/null);
     if [[ -n "$version" ]]; then
-        printf "  javascript (package.json): %s\n" "$version";
+        output+="  javascript (package.json): ${version}\n"
         found_any=1;
     fi
     
     # Python
     version=$(get_python_version 2>/dev/null);
     if [[ -n "$version" ]]; then
-        printf "  python (pyproject.toml/setup.py): %s\n" "$version";
+        output+="  python (pyproject.toml/setup.py): ${version}\n"
         found_any=1;
     fi
     
@@ -137,28 +141,28 @@ do_get_all() {
     if [[ -n "$bash_file" ]]; then
         version=$(get_bash_version "$bash_file" 2>/dev/null);
         if [[ -n "$version" ]]; then
-            printf "  bash (%s): %s\n" "$bash_file" "$version";
+            output+="  bash (${bash_file}): ${version}\n"
             found_any=1;
         fi
     fi
     
     # Git information
-    printf "\n%s=== Git Repository ===%s\n" "$bld" "$x";
+    output+="\n${bld}=== Git Repository ===${x}\n"
     
     git_version=$(_latest_tag 2>/dev/null);
     if [[ -n "$git_version" ]]; then
-        printf "  latest tag: %s\n" "$git_version";
+        output+="  latest tag: ${git_version}\n"
         found_any=1;
     else
-        printf "  latest tag: none\n";
+        output+="  latest tag: none\n"
     fi
     
     # Semv calculations
-    printf "\n%s=== SEMV Analysis ===%s\n" "$bld" "$x";
+    output+="\n${bld}=== SEMV Analysis ===${x}\n"
     
     semv_version=$(do_next_semver "${git_version:-v0.0.0}" 2>/dev/null);
     if [[ -n "$semv_version" ]]; then
-        printf "  calculated next: %s\n" "$semv_version";
+        output+="  calculated next: ${semv_version}\n"
         found_any=1;
     fi
     
@@ -166,21 +170,29 @@ do_get_all() {
     local build_number;
     build_number=$(_build_number 2>/dev/null);
     if [[ -n "$build_number" ]]; then
-        printf "  build number: %s\n" "$build_number";
+        output+="  build number: ${build_number}\n"
     fi
     
     # Project detection summary
-    printf "\n%s=== Project Type ===%s\n" "$bld" "$x";
+    output+="\n${bld}=== Project Type ===${x}\n"
     project_types=$(detect_project_type 2>/dev/null);
     if [[ -n "$project_types" ]]; then
-        printf "  detected: %s\n" "$project_types";
+        output+="  detected: ${project_types}\n"
     else
-        printf "  detected: none/unknown\n";
+        output+="  detected: none/unknown\n"
     fi
     
+    # Check if we found anything meaningful
     if [[ "$found_any" -eq 0 ]]; then
         printf "\n%sNo version information found%s\n" "$yellow" "$x";
         return 1;
+    fi
+    
+    # Output with optional boxy wrapper
+    if [[ "$SEMV_USE_BOXY" == "1" ]] && command_exists boxy; then
+        printf "%b" "$output" | boxy --theme info --title "📊 Version Summary"
+    else
+        printf "%b" "$output"
     fi
     
     return 0;

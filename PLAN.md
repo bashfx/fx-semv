@@ -44,9 +44,42 @@ From TASKS.md analysis:
 
 **Integration Opportunities**:
 1. **Status reporting** - Use themed boxes for `semv status` output
+   ```bash
+   # Current output (plain text)
+   Repository: fx-semv
+   Latest tag: v2.0.0
+   Build count: 42
+   
+   # With boxy (visual boxes)
+   echo -e "Repository: fx-semv\nLatest tag: v2.0.0\nBuild count: 42" | boxy --theme info --title "SEMV Status"
+   ```
+
 2. **Error messaging** - Replace `error()` calls with `--theme error`
+   ```bash
+   # Current: error "Version drift detected"
+   # With boxy: echo "Version drift detected" | boxy --theme error --title "⚠️  Warning"
+   ```
+
 3. **Success feedback** - Use `--theme success` for completed operations
+   ```bash
+   # Current: okay "Version bumped to v2.0.1"
+   # With boxy: echo "Version bumped to v2.0.1" | boxy --theme success --title "✓ Success"
+   ```
+
 4. **Build dashboards** - Create visual build count/status displays
+   ```bash
+   # Multi-box dashboard for semv audit
+   boxy --theme neutral --title "Version Sources" < version_data.txt
+   boxy --theme info --title "Git Status" < git_data.txt
+   boxy --theme success --title "Sync Status" < sync_data.txt
+   ```
+
+5. **Drift visualization** - Show version mismatches clearly
+   ```bash
+   # When drift detected, show side-by-side comparison
+   echo "Package: v2.0.1" | boxy --theme warning --title "Package Version"
+   echo "Git Tag: v2.0.0" | boxy --theme info --title "Git Version"
+   ```
 
 **Implementation Strategy**: 
 - Add optional boxy wrapper functions in part 03_printers.sh
