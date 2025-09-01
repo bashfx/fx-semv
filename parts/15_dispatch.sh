@@ -6,6 +6,40 @@
 
 ################################################################################
 #
+#  print_version - Show tool version from meta header
+#
+################################################################################
+# Returns: 0 always
+# Reads the first matching version meta comment near header
+
+print_version() {
+    local file="${SEMV_PATH:-${BASH_SOURCE[0]}}";
+    local header;
+    local line="";
+    local ver="";
+
+    # Only search near header to avoid matching code examples later
+    if [[ -r "$file" ]]; then
+        header=$(head -n 120 "$file" 2>/dev/null);
+        # Prefer explicit semv-version/version/app-version keys
+        line=$(printf '%s\n' "$header" | grep -im1 -E '^[#;][[:space:]]*(semv-version|version|app-version)[[:space:]]*:' || true)
+        if [[ -z "$line" ]]; then
+            # Fallback to semv-revision if no explicit version key is present
+            line=$(printf '%s\n' "$header" | grep -im1 -E '^[#;][[:space:]]*semv-revision[[:space:]]*:' || true)
+        fi
+    fi
+
+    if [[ -n "$line" ]]; then
+        # Strip up to colon, then trim whitespace
+        ver=$(printf '%s' "$line" | sed -E 's/^[^:]*:[[:space:]]*//; s/[[:space:]]+$//');
+    fi
+
+    printf "semv %s\n" "${ver:-unknown}";
+    return 0;
+}
+
+################################################################################
+#
 #  dispatch - Route commands to appropriate do_* functions
 #
 ################################################################################
@@ -184,6 +218,7 @@ ${bld}FLAGS:${x}
     ${yellow}-d, --debug${x}        Enable debug messages
     ${yellow}-t, --trace${x}        Enable trace messages  
     ${yellow}-q, --quiet${x}        Quiet mode (errors only)
+    ${yellow}-v, --version${x}      Show version and exit
     ${yellow}-f, --force${x}        Force operations
     ${yellow}-y, --yes${x}          Auto-answer yes to prompts
     ${yellow}-D, --dev${x}          Master dev flag (enables -d, -t)
@@ -227,6 +262,12 @@ main() {
     if ! options "${orig_args[@]}"; then
         error "Failed to parse options";
         return 1;
+    fi
+
+    # Fast path: version flag
+    if [[ "${opt_version:-1}" -eq 0 ]]; then
+        print_version;
+        return 0;
     fi
     
     # Filter out flags to get commands/args

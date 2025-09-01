@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
 # semv-config.sh - Configuration and Constants
+# semv-version: 2.0.0
 # semv-revision: 2.0.0
 # BashFX compliant configuration module
 #
@@ -47,6 +48,16 @@ export TERM=xterm-256color;
 
 ################################################################################
 #
+#  Semv Tool Version
+#
+################################################################################
+
+# Application version (shown by --version / -v)
+# Keep in sync with module semv-revision values
+readonly SEMV_APP_VERSION="2.0.0";
+
+################################################################################
+#
 #  Default Option States
 #
 ################################################################################
@@ -64,6 +75,7 @@ opt_dev_note=1;    # 0=enabled, 1=disabled (default off=1)
 opt_build_dir=1;   # 0=enabled, 1=disabled (default off=1)
 opt_no_cursor=1;   # 0=enabled, 1=disabled (default off=1)
 opt_auto=0;        # 0=enabled (auto-mode default on to avoid prompts), 1=disabled
+opt_version=1;     # 0=show version and exit, 1=normal
 
 ################################################################################
 #

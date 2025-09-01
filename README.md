@@ -70,6 +70,9 @@ semv can
 # Show current version
 semv
 
+# Show semv tool version
+semv --version
+
 # Calculate next version (dry run)
 semv next
 
@@ -269,6 +272,7 @@ semv reset              # Reset configuration
 | `-d` | Enable debug messages |
 | `-t` | Enable trace messages |
 | `-q` | Quiet mode (errors only) |
+| `-v` | Show semv version and exit |
 | `-D` | Master dev flag (enables -d, -t) |
 
 ### Behavior Control

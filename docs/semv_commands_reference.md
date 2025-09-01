@@ -12,6 +12,12 @@ DEPRECATION NOTICE: This reference may be out of date. Prefer `README.md` for cu
 semv [command] [arguments] [flags]
 ```
 
+## Tool Info
+
+```bash
+semv --version         # Show semv tool version (from meta header)
+```
+
 ## Version Operations
 
 ### `semv` (default)

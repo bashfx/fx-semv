@@ -26,6 +26,10 @@ options() {
         next="${opts[i+1]}";
         
         case "$this" in
+            --version|-v)
+                # Show application version and exit
+                opt_version=0;
+                ;;
             --debug|-d)
                 opt_debug=0;
                 opt_quiet=1;
