@@ -177,6 +177,7 @@ ${bld}USAGE:${x}
 
 ${bld}VERSION OPERATIONS:${x}
     ${green}semv${x}              Show current version (default)
+    ${green}version${x}           Show current version (alias)
     ${green}next${x}              Calculate next version (dry run) 
     ${green}bump${x}              Create and push new version tag
     ${green}tag${x}               Show latest semantic version tag
@@ -219,6 +220,7 @@ ${bld}SYNCHRONIZATION:${x}
     ${green}sync [FILE]${x}       Sync using optional version source file
 
 ${bld}FLAGS:${x}
+    ${yellow}-h, --help${x}         Show help and exit
     ${yellow}-d, --debug${x}        Enable debug messages
     ${yellow}-t, --trace${x}        Enable trace messages  
     ${yellow}-q, --quiet${x}        Quiet mode (errors only)
@@ -227,6 +229,7 @@ ${bld}FLAGS:${x}
     ${yellow}-y, --yes${x}          Auto-answer yes to prompts
     ${yellow}-D, --dev${x}          Master dev flag (enables -d, -t)
     ${yellow}-N, --dev-note${x}     Add dev/build suffix to next version
+        --dry-run                Dry run mode (show what would happen)
         --view=MODE              View mode: data | simple | full
         --auto / --no-auto         Automation mode (silence prompts) / restore prompts
 
