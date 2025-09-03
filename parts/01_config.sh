@@ -75,7 +75,9 @@ opt_dev_note=1;    # 0=enabled, 1=disabled (default off=1)
 opt_build_dir=1;   # 0=enabled, 1=disabled (default off=1)
 opt_no_cursor=1;   # 0=enabled, 1=disabled (default off=1)
 opt_auto=0;        # 0=enabled (auto-mode default on to avoid prompts), 1=disabled
+opt_help=1;        # 0=show help and exit, 1=normal
 opt_version=1;     # 0=show version and exit, 1=normal
+opt_dry_run=1;     # 0=dry run mode (show what would happen), 1=normal
 
 ################################################################################
 #

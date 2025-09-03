@@ -61,6 +61,7 @@ dispatch() {
     case "$cmd" in
         # Version Operations
         ""|latest|tag)     func_name="do_latest_semver";;
+        version|ver)       func_name="do_latest_semver";;
         next|dry)          func_name="do_next_semver";;
         bump)              func_name="do_bump";;
         
@@ -69,7 +70,8 @@ dispatch() {
         pend|pending)      func_name="do_pending";;
         chg|changes)       func_name="do_change_count";;
         since|last)        func_name="do_last";;
-        st|status)         func_name="do_status";;
+        st|status)         func_name="do_info";;
+        gs)                func_name="do_status";;
         
         # Build Operations
         file)              func_name="do_build_file";;
@@ -180,10 +182,12 @@ ${bld}VERSION OPERATIONS:${x}
     ${green}tag${x}               Show latest semantic version tag
 
 ${bld}PROJECT ANALYSIS:${x}
-    ${green}info${x}              Show repository and version status
+    ${green}info${x}              Overall repository and version status
+    ${green}status${x}            Alias of 'info' (overall status)
+    ${green}st${x}                Alias of 'status'
+    ${green}gs${x}                Git working tree status (# changed files)
     ${green}pend${x}              Show pending changes since last tag
     ${green}since${x}             Time since last commit
-    ${green}status${x}            Show working directory status
 
 ${bld}BUILD OPERATIONS:${x}
     ${green}file${x}              Generate build info file
@@ -212,7 +216,7 @@ ${bld}VERSION GET/SET:${x}
     ${green}set TYPE VER [FILE]${x} Update version in specified source
 
 ${bld}SYNCHRONIZATION:${x}
-    ${green}sync${x}              Auto-detect and sync all sources
+    ${green}sync [FILE]${x}       Sync using optional version source file
 
 ${bld}FLAGS:${x}
     ${yellow}-d, --debug${x}        Enable debug messages
@@ -223,6 +227,7 @@ ${bld}FLAGS:${x}
     ${yellow}-y, --yes${x}          Auto-answer yes to prompts
     ${yellow}-D, --dev${x}          Master dev flag (enables -d, -t)
     ${yellow}-N, --dev-note${x}     Add dev/build suffix to next version
+        --view=MODE              View mode: data | simple | full
         --auto / --no-auto         Automation mode (silence prompts) / restore prompts
 
 ${bld}COMMIT LABELS:${x}
@@ -264,6 +269,12 @@ main() {
         return 1;
     fi
 
+    # Fast path: help flag
+    if [[ "${opt_help:-1}" -eq 0 ]]; then
+        usage;
+        return 0;
+    fi
+    
     # Fast path: version flag
     if [[ "${opt_version:-1}" -eq 0 ]]; then
         print_version;

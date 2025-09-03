@@ -26,6 +26,10 @@ options() {
         next="${opts[i+1]}";
         
         case "$this" in
+            --help|-h)
+                # Show help and exit
+                opt_help=0;
+                ;;
             --version|-v)
                 # Show application version and exit
                 opt_version=0;
@@ -58,6 +62,10 @@ options() {
                 ;;
             --dev-note|-N)
                 opt_dev_note=0;
+                ;;
+            --dry-run)
+                # Dry run mode - show what would happen without doing it
+                opt_dry_run=0;
                 ;;
             --build-dir|-B)
                 opt_build_dir=0;

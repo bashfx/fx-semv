@@ -32,6 +32,74 @@ boxy_msg() {
 
 ################################################################################
 #
+#  View Orchestration (Boxy Integration)
+#
+################################################################################
+
+# view - Render content via boxy (if available) with a standard contract
+# Arguments:
+#   1: theme  - boxy theme (e.g., info, success, warn, error)
+#   2: title  - title string
+#   3: content - content to render (string)
+#   4+: extra boxy flags (optional)
+# Behavior:
+#   - If --view=data, prints content only to stdout (no decorations)
+#   - If boxy present and not in data mode, renders with boxy and prints to stderr
+#   - Otherwise, prints simple fallback (title + content) to stderr
+view() {
+    local theme="$1"; shift || true
+    local title="$1"; shift || true
+    local content="$1"; shift || true
+    local mode
+    mode=$(get_view_mode)
+
+    case "$mode" in
+        data)
+            # Data-only passthrough for ingestion/subcommands
+            printf "%s\n" "$content"
+            return 0
+            ;;
+        simple|full|*)
+            if command_exists boxy; then
+                printf "%b\n" "$content" | boxy --theme "${theme:-info}" --title "${title:-}" "$@"
+            else
+                # Fallback
+                printf "%s%s%s\n" "$bld" "${title:-}" "$x" >&2
+                printf "%b\n" "$content" >&2
+            fi
+            ;;
+    esac
+}
+
+# view_status - Convenience renderer for status blocks
+# Arguments:
+#   1: content
+# Uses theme=info, title="Repository Status"
+view_status() {
+    local content="$1"
+    view info "Repository Status" "$content"
+}
+
+################################################################################
+#
+#  Drift View Orchestrator
+#
+################################################################################
+# Arguments:
+#   1: content - prepared content
+#   2: state   - "drift" or "aligned" (optional)
+# Behavior: Uses warn theme for drift, info for aligned
+
+view_drift() {
+    local content="$1"
+    local state="${2:-aligned}"
+    local theme="info"
+    [[ "$state" == "drift" ]] && theme="warn"
+    view "$theme" "Version Drift" "$content"
+}
+
+################################################################################
+#
 #  Core Printer Helper
 #
 ################################################################################
@@ -235,8 +303,8 @@ identify() {
 ################################################################################
 
 get_view_mode() {
-    local mode="${opt_view:-simple}";
-    [[ "$mode" =~ ^(data|simple|full)$ ]] && echo "$mode" || echo "simple";
+    local mode="${opt_view:-full}";
+    [[ "$mode" =~ ^(data|simple|full)$ ]] && echo "$mode" || echo "full";
 }
 
 # Mark printers as loaded (load guard pattern)

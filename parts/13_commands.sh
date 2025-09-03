@@ -143,6 +143,84 @@ _do_retag() {
 
 ################################################################################
 #
+#  status_data - Data-only status producer (machine-readable)
+#
+################################################################################
+# Returns: 0 on success, 1 on failure
+# Output (stdout): single-line semicolon-separated key=value pairs
+# Keys: user, repo, branch, main_branch, changes, build_local, build_remote,
+#       days, since, tags_last, tags_release, version_current, version_next
+
+status_data() {
+    local user branch main_branch project
+    local build_local build_remote changes days since
+    local tags_last tags_release
+    local version_current version_next
+    local pkg git calc
+
+    if ! is_repo; then
+        return 1;
+    fi
+
+    # Basics
+    user=$(this_user 2>/dev/null || true)
+    branch=$(this_branch 2>/dev/null || true)
+    main_branch=$(which_main 2>/dev/null || true)
+    project=$(this_project 2>/dev/null || true)
+
+    # Metrics
+    if has_commits; then
+        build_local=$(__git_build_count 2>/dev/null || echo 0)
+        build_remote=$(__git_remote_build_count 2>/dev/null || echo 0)
+        changes=$(__git_status_count 2>/dev/null || echo 0)
+        since=$(do_since_pretty 2>/dev/null || echo unknown)
+        days=$(do_days_ago 2>/dev/null || echo 0)
+    else
+        build_local=0; build_remote=0; changes=0; since=unknown; days=0;
+    fi
+
+    # Tags
+    tags_last=$(do_latest_semver 2>/dev/null || true)
+    if git rev-parse -q --verify refs/tags/release >/dev/null 2>&1; then
+        local rel_commit rel_ver rel_short
+        rel_commit=$(git rev-parse release 2>/dev/null || true)
+        rel_ver=$(git tag --points-at "$rel_commit" | grep -E 'v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)
+        rel_short=$(git rev-parse --short "$rel_commit" 2>/dev/null || true)
+        if [[ -n "$rel_ver" ]]; then
+            tags_release="$rel_ver"
+        else
+            tags_release=""
+        fi
+    else
+        tags_release=""
+    fi
+
+    # Versions
+    if has_semver; then
+        version_current=$(do_latest_semver 2>/dev/null || true)
+        version_next=$(do_next_semver 0 2>/dev/null || true)
+    else
+        version_current=""
+        version_next=""
+    fi
+
+    # Provide consolidated fields for consumers (avoid multiple data sources)
+    # pkg: highest package file version if any
+    local project_types
+    if project_types=$(detect_project_type 2>/dev/null); then
+        pkg=$(_get_package_version "$project_types" 2>/dev/null || true)
+    fi
+    git="$tags_last"
+    calc="$version_next"
+
+    # Emit semicolon-separated kv stream (single line)
+    printf "user=%s;repo=%s;branch=%s;main_branch=%s;changes=%s;build_local=%s;build_remote=%s;days=%s;since=%s;tags_last=%s;tags_release=%s;version_current=%s;version_next=%s;pkg=%s;git=%s;calc=%s\n" \
+        "$user" "$project" "$branch" "$main_branch" "$changes" "$build_local" "$build_remote" "$days" "$since" "$tags_last" "$tags_release" "$version_current" "$version_next" "$pkg" "$git" "$calc"
+    return 0
+}
+
+################################################################################
+#
 #  do_info - Show repository and version status
 #
 ################################################################################
@@ -158,78 +236,132 @@ do_info() {
     local build;
     local remote_build;
     local changes;
+    local changes_num;
     local since;
     local days;
     local semver;
     local next;
+    local latest_tag="";
+    local release_desc="";
     local msg="";
     
+    # Data view passthrough
+    if [[ "$(get_view_mode)" == "data" ]]; then
+        status_data;
+        return $?
+    fi
+
     if ! is_repo; then
         error "Not in a git repository";
         return 1;
     fi
     
-    # Gather repository information
-    user=$(this_user);
-    branch=$(this_branch);
-    main_branch=$(which_main);
-    project=$(this_project);
+    # Gather base info via status_data for consistency
+    local kd i key val data
+    data=$(status_data 2>/dev/null || true)
+    # Parse semicolon-separated kv pairs
+    IFS=';' read -ra kd <<< "$data"
+    for i in "${kd[@]}"; do
+        key="${i%%=*}"; val="${i#*=}"
+        case "$key" in
+            user) user="$val";;
+            repo) project="$val";;
+            branch) branch="$val";;
+            main_branch) main_branch="$val";;
+            changes) changes_num="$val";;
+            build_local) build="$val";;
+            build_remote) remote_build="$val";;
+            days) days="$val";;
+            since) since="$val";;
+            tags_last) latest_tag="$val";;
+            tags_release) release_desc="$val";;
+            version_current) semver="$val";;
+            version_next) next="$val";;
+        esac
+    done
     
     if [[ -z "$user" ]]; then
         user="${red}-unset-${x}";
     fi
     
     if has_commits; then
-        build=$(__git_build_count);
-        remote_build=$(__git_remote_build_count);
-        changes=$(__git_status_count);
-        since=$(do_since_pretty);
-        days=$(do_days_ago);
+        # already populated from data; ensure defaults
+        build="${build:-0}"; remote_build="${remote_build:-0}";
+        changes_num="${changes_num:-0}"; since="${since:-unknown}"; days="${days:-0}";
         
         # Format change count
-        if [[ "$changes" -gt 0 ]]; then
-            changes="${green}Edits +$changes${x}";
+        if [[ "$changes_num" -gt 0 ]]; then
+            changes="${green}${changes_num}${x} file(s)";
         else
-            changes="${grey}none${x}";
+            changes="${grey}0${x} file(s)";
         fi
         
         # Format build comparison
         if [[ "$remote_build" -gt "$build" ]]; then
-            remote_build="${green}${remote_build}${x}";
+            remote_build="${green}${remote_build}${x}";  # remote ahead
         elif [[ "$remote_build" -eq "$build" ]]; then
-            # Equal builds - no highlighting
-            :;
+            :; # equal
         else
-            build="${green}${build}${x}";
+            build="${green}${build}${x}";                # local ahead
         fi
         
-        # Build info message
+        # latest_tag and release_desc already populated via status_data
+
+        # Build info message (emoji + 4-letter codes); colorize bracketed data fields
         msg+="~~ Repository Status ~~\n";
-        msg+="${spark} User: [${user}]\n";
-        msg+="${spark} Repo: [${project}] [${branch}] [${main_branch}]\n";
-        msg+="${spark} Changes: [${changes}]\n";
-        msg+="${spark} Build: [${build}:${remote_build}]\n";
-        msg+="${spark} Last: [${days} days] ${since}\n";
-        
-        # Version information
-        if has_semver; then
-            semver=$(do_latest_semver);
-            next=$(do_next_semver 0 2>/dev/null);
-            
-            if [[ -z "$next" ]]; then
-                next="${red}-none-${x}";
-            elif do_is_greater "$next" "$semver"; then
-                next="${green} -> ${next}${x}";
-            elif [[ "$next" == "$semver" ]]; then
-                next="<-same-> ${next}";
-            fi
-            
-            msg+="${spark} Version: [${semver} ${next}]";
+        msg+="👷 USER: [${grey}${user}${x}]\n";
+        msg+="📦 REPO: [${grey}${project}${x}] [${grey}${branch}${x}] [${grey}${main_branch}${x}]\n";
+        # Changes: color whole bracket (green when >0, grey when 0)
+        local chng_disp chng_color
+        chng_disp="${changes_num} file(s)"
+        if [[ "$changes_num" -gt 0 ]]; then chng_color="$green"; else chng_color="$grey"; fi
+        msg+="✏️ CHNG: [${chng_color}${chng_disp}${x}]\n";
+        # Build: color numbers by relation, keep bracket context orange
+        local col_local col_remote
+        if [[ "$build" -gt "$remote_build" ]]; then
+            col_local="$green"; col_remote="$red";
+        elif [[ "$build" -lt "$remote_build" ]]; then
+            col_local="$red"; col_remote="$green";
         else
-            msg+="${spark} Version: [${red}-unset-${x}]";
+            col_local="$blue"; col_remote="$blue";
+        fi
+        msg+="🔧 BULD: [${grey}local=${col_local}${build}${x}${grey} remote=${col_remote}${remote_build}${x}]\n";
+        # Last: color whole bracket in orange for readability; pretty string follows as-is
+        msg+="⏱️ LAST: [${grey}${days} days${x}] ${since}\n";
+        # Tags on one line: last [ ] release [ ] with colored contents
+        local ltag_disp rtag_disp
+        if [[ -n "$latest_tag" ]]; then
+            ltag_disp="${grey}${latest_tag}${x}"
+        else
+            ltag_disp="${grey}-none-${x}"
+        fi
+        if [[ -n "$release_desc" ]]; then
+            rtag_disp="${grey}${release_desc}${x}"
+        else
+            rtag_disp="${grey}-none-${x}"
+        fi
+        msg+="🏷️ TAGS: last [${ltag_disp}] release [${rtag_disp}]\n";
+        
+        # Version information (color current in grey; next colored by relation)
+        if has_semver; then
+            local next_raw next_disp
+            next_raw="${next}"  # from status_data
+            if [[ -z "$next_raw" ]]; then
+                next_disp="${red}-none-${x}"
+            elif [[ "$next_raw" == "$semver" ]]; then
+                next_disp="${blue}${next_raw}${x}"  # same
+            elif do_is_greater "$next_raw" "$semver"; then
+                next_disp="${green}${next_raw}${x}" # ahead
+            else
+                next_disp="${orange}${next_raw}${x}" # fallback
+            fi
+            msg+="🔎 VERS: [${grey}${semver}${x} -> ${next_disp}]";
+        else
+            msg+="🔎 VERS: [${red}-unset-${x}]";
         fi
         
-        printf "%b\n" "$msg" >&2;
+        # Render via view layer (boxy if available), support --view=data passthrough
+        view_status "$msg";
     else
         warn "Repository: [${user}] [${project}] [${branch}] [${red}no commits${x}]";
     fi
@@ -534,14 +666,22 @@ do_status() {
     
     count=$(__git_status_count);
     final_result="$count"
-    
-    # Output with optional boxy wrapper
+
+    # Human-readable summary to stderr to avoid confusion with build count
+    if [[ "$count" -eq 0 ]]; then
+        okay "Working tree is clean"
+    else
+        warn "Working tree has $count changed file(s)"
+    fi
+
+    # Machine-readable count on stdout (kept for scripts)
     if [[ "$SEMV_USE_BOXY" == "1" ]] && command_exists boxy; then
         echo "$final_result" | boxy --theme info --title "📊 Git Status Count"
     else
         echo "$final_result"
     fi
-    
+
+    # Exit code: 0 if changes exist, 1 if clean (legacy behavior)
     if [[ "$count" -gt 0 ]]; then
         return 0;
     else
@@ -614,7 +754,7 @@ do_inspect() {
     info "";
     info "Dispatch table commands:";
     info "Version: latest, next, bump";
-    info "Analysis: info, pending, changes, since, status";
+    info "Analysis: info, status, gs, pending, changes, since";
     info "Build: file, bc, bcr";
     info "Repo: new, can, fetch, tags";
     info "Remote: remote, upstream, rbc";
@@ -804,9 +944,12 @@ do_days_ago() {
 # Stream Usage: Messages to stderr
 
 do_sync() {
+    # Optional: source file to compare/sync against
+    local source_file="${1:-}";
+
     info "Starting version synchronization and conflict resolution...";
-    
-    if resolve_version_conflicts; then
+
+    if resolve_version_conflicts "$source_file"; then
         okay "Version synchronization completed successfully";
         return 0;
     else

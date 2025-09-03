@@ -20,37 +20,55 @@
 # Stream Usage: Messages to stderr
 
 resolve_version_conflicts() {
+    local source_file="${1:-}";
     local ret=1;
     local project_types;
-    local package_version;
+    local package_version="";
     local git_version; 
     local semv_version;
-    
+
     info "Analyzing version sources for conflicts...";
-    
-    # Detect project type(s)
-    if ! project_types=$(detect_project_type); then
-        error "Failed to detect project type";
-        return 1;
+
+    # If a specific source file is provided, extract version from it directly
+    if [[ -n "$source_file" ]]; then
+        if [[ -f "$source_file" ]]; then
+            package_version=$(__extract_version_from_file "$source_file");
+            if [[ -z "$package_version" ]]; then
+                warn "Could not extract version from: $source_file";
+            else
+                trace "Using provided source file version: $package_version ($source_file)";
+            fi
+        else
+            warn "Source file not found: $source_file";
+        fi
     fi
-    
-    # Get versions from different sources
-    package_version=$(_get_package_version "$project_types");
+
+    # If no override version, fall back to auto detection of project types/files
+    if [[ -z "$package_version" ]]; then
+        if project_types=$(detect_project_type); then
+            package_version=$(_get_package_version "$project_types");
+        else
+            # No supported project types found; continue with tags-only authority
+            warn "No supported package files detected; using tags as authority";
+        fi
+    fi
+
+    # Get tag and calculated versions
     git_version=$(_latest_tag);
-    # Normalize git version to number (strip leading 'v') for comparison
-    local git_version_num="${git_version#v}"
+    # Normalize git version to number (strip leading 'v') for potential comparisons
+    local git_version_num="${git_version#v}";
     semv_version=$(_calculate_semv_version);
-    
+
     trace "Package version: ${package_version:-none}";
-    trace "Git tag version: ${git_version:-none}";  
+    trace "Git tag version: ${git_version:-none}";
     trace "Calculated version: ${semv_version:-none}";
-    
-    # Analyze version relationships
+
+    # Analyze version relationships (highest wins policy handled inside)
     if ! _analyze_version_drift "$package_version" "$git_version" "$semv_version"; then
         error "Version analysis failed";
         return 1;
     fi
-    
+
     ret=0;
     return "$ret";
 }
@@ -455,6 +473,68 @@ __offer_version_catchup() {
 
 ################################################################################
 #
+#  __extract_version_from_file - Extract version from a specific file path
+#
+################################################################################
+# Arguments:
+#   1: file_path - Path to file containing a version
+# Returns: 0 on success, 1 on failure
+# Stream Usage: Version (without leading 'v') to stdout
+
+__extract_version_from_file() {
+    local file_path="$1";
+    local version="";
+
+    if [[ ! -f "$file_path" ]]; then
+        return 1;
+    fi
+
+    case "$file_path" in
+        *package.json)
+            version=$(grep -m1 '"version"' "$file_path" | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//');
+            ;;
+        *pyproject.toml)
+            version=$(awk '
+                /^\[project\]/ { in_project=1; next }
+                /^\[/ { in_project=0; next }
+                in_project && /^version\s*=/ {
+                    gsub(/.*=\s*"/, "");
+                    gsub(/".*/, "");
+                    print; exit;
+                }
+            ' "$file_path");
+            ;;
+        *setup.py)
+            version=$(grep -o 'version[[:space:]]*=[[:space:]]*["'\'''][^"'\''']*["'\''']' "$file_path" | head -1 | sed 's/.*=[[:space:]]*["'\''']//; s/["'\''].*$//');
+            ;;
+        *Cargo.toml)
+            version=$(awk '
+                /^\[package\]/ { in_package=1; next }
+                /^\[/ { in_package=0; next }
+                in_package && /^version\s*=/ {
+                    gsub(/.*=\s*"/, "");
+                    gsub(/".*/, "");
+                    print; exit;
+                }
+            ' "$file_path");
+            ;;
+        *.sh|*)
+            # Default: try bash-style version comments near header
+            version=$(grep -E "^[[:space:]]*#[[:space:]]*(semv-version|semv-revision|version):" "$file_path" | grep -v '\$\|"' | head -1 | sed 's/.*:[[:space:]]*//');
+            ;;
+    esac
+
+    if [[ -n "$version" ]]; then
+        version=$(echo "$version" | sed 's/^v//;s/[[:space:]]*$//g' | awk '{print $1}')
+        printf "%s\n" "$version";
+        return 0;
+    fi
+
+    return 1;
+}
+
+################################################################################
+#
 #  __update_package_version - Update version in package file(s)
 #
 ################################################################################
@@ -503,49 +583,68 @@ __update_package_version() {
 # Stream Usage: Analysis output to stderr
 
 do_drift() {
-    local project_types;
-    local package_version;
-    local git_version; 
-    local semv_version;
-    local ret=0;
-    
-    info "Analyzing version drift between sources...";
-    
-    # Detect project type(s)
-    if ! project_types=$(detect_project_type); then
-        error "Failed to detect project type";
-        return 1;
-    fi
-    
-    # Get versions from different sources
-    package_version=$(_get_package_version "$project_types");
-    git_version=$(_latest_tag);
-    semv_version=$(_calculate_semv_version);
-    # Normalize git version to numeric (strip leading 'v') for comparisons
-    local git_version_num="${git_version#v}"
-    
-    # Display current state
-    printf "\n%s=== Version Source Analysis ===%s\n" "$bld" "$x" >&2;
-    printf "  Package file(s): %s\n" "${package_version:-none}" >&2;
-    printf "  Git latest tag:  %s\n" "${git_version:-none}" >&2;
-    printf "  Calculated next: %s\n" "${semv_version:-none}" >&2;
-    
-    # Analyze drift using current sources only (package vs current tag)
-    if [[ -n "$package_version" ]] && [[ -n "$git_version_num" ]] && [[ "$package_version" != "$git_version_num" ]]; then
-        printf "\n%s⚠️  VERSION DRIFT DETECTED%s\n" "$orange" "$x" >&2;
-        printf "Sources are not aligned. Run 'semv sync' to resolve.\n" >&2;
-        ret=0; # drift
-    else
-        # No drift if only one source present or both equal
-        printf "\n%s✓ Current sources are aligned%s\n" "$green" "$x" >&2;
-        # If no tags found but package exists, report baseline info
-        if [[ -z "$git_version" ]] && [[ -n "$package_version" ]]; then
-            info "No git tags found; using package version as baseline";
+    local view_mode
+    view_mode=$(get_view_mode)
+
+    # Data view passthrough
+    if [[ "$view_mode" == "data" ]]; then
+        status_data
+        local kd i key val drift="0" pkg git
+        IFS=';' read -ra kd <<< "$(status_data 2>/dev/null || true)"
+        for i in "${kd[@]}"; do
+            key="${i%%=*}"; val="${i#*=}";
+            case "$key" in
+                pkg) pkg="$val";;
+                git) git="$val";;
+            esac
+        done
+        local git_num="${git#v}"
+        if [[ -n "$pkg" ]] && [[ -n "$git_num" ]] && [[ "$pkg" != "$git_num" ]]; then
+            drift="1"
+        else
+            drift="0"
         fi
-        ret=1; # aligned
+        if [[ "$drift" == "1" ]]; then
+            return 0
+        else
+            return 1
+        fi
     fi
-    
-    return "$ret";
+
+    # Human view: use drift_data for consistency
+    local data kd i key val pkg git calc drift="0"
+    data=$(status_data 2>/dev/null || true)
+    IFS=';' read -ra kd <<< "$data"
+    for i in "${kd[@]}"; do
+        key="${i%%=*}"; val="${i#*=}"
+        case "$key" in
+            pkg) pkg="$val";;
+            git) git="$val";;
+            calc) calc="$val";;
+        esac
+    done
+    local git_num="${git#v}"
+    if [[ -n "$pkg" ]] && [[ -n "$git_num" ]] && [[ "$pkg" != "$git_num" ]]; then
+        drift="1"
+    else
+        drift="0"
+    fi
+
+    local msg=""
+    msg+="~~ Version Drift Analysis ~~\n"
+    msg+="📦 PKG: [${grey}${pkg:- -none-}${x}]\n"
+    msg+="🏷️ GIT: [${grey}${git:- -none-}${x}]\n"
+    msg+="🔢 CALC: [${grey}${calc:- -none-}${x}]\n"
+    if [[ "$drift" == "1" ]]; then
+        msg+="🧭 STATE: [${orange}DRIFT${x}]\n"
+        msg+="Run 'semv sync' to resolve version drift.\n"
+        view_drift "$msg" drift
+        return 0
+    else
+        msg+="🧭 STATE: [${green}ALIGNED${x}]\n"
+        view_drift "$msg" aligned
+        return 1
+    fi
 }
 
 ################################################################################
