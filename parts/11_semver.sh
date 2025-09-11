@@ -270,7 +270,7 @@ do_build_file() {
     if printf "%s\n" "$(date)" > "$dest"; then
         ret=0;
     fi
-    j semv
+
     return "$ret";
 }
 
