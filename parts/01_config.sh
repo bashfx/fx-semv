@@ -47,7 +47,7 @@ readonly SEMV_MIN_BUILD=1000;     # Minimum build number floor
 export TERM=xterm-256color;
 
 SEMV_BUILD_FILE="semv.build"
-BUILD_DIR
+BUILD_DIR="$PWD"
 
 ################################################################################
 #
