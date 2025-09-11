@@ -16,13 +16,14 @@
 #
 ################################################################################
 # Returns: 0 on success, 1 on failure or ambiguous project
-# Local Variables: ret, found_types, type_count
+# Local Variables: ret, found_types, type_count, bash_pattern
 # Stream Usage: Messages to stderr, detected types to stdout
 
 detect_project_type() {
     local ret=1;
     local -a found_types=();
     local type_count;
+    local bash_pattern="";
     
     trace "Detecting project type...";
     
@@ -55,27 +56,11 @@ detect_project_type() {
         fi
     fi
     
-    # Check for Bash (look for .semvrc or specified file)
-    if [[ -f ".semvrc" ]]; then
-        local bash_file;
-        bash_file=$(grep "^BASH_VERSION_FILE=" ".semvrc" 2>/dev/null | cut -d'=' -f2 | tr -d '"'"'");
-        if [[ -n "$bash_file" ]] && [[ -f "$bash_file" ]]; then
-            if grep -q "# semv-version:" "$bash_file" 2>/dev/null || grep -q "# version:" "$bash_file" 2>/dev/null; then
-                found_types+=("bash");
-                trace "Detected Bash project (${bash_file} with version comment)";
-            fi
-        fi
-    else
-        # Look for common bash script patterns
-        local bash_files;
-        mapfile -t bash_files < <(find . -maxdepth 2 -name "*.sh" -type f 2>/dev/null)
-        for file in "${bash_files[@]}"; do
-            if grep -q "# semv-version:" "$file" 2>/dev/null || grep -q "# version:" "$file" 2>/dev/null; then
-                found_types+=("bash");
-                trace "Detected Bash project (${file} with version comment)";
-                break;
-            fi
-        done
+    # Enhanced Bash project detection with pattern identification
+    bash_pattern=$(detect_bash_project_pattern);
+    if [[ -n "$bash_pattern" ]]; then
+        found_types+=("bash");
+        trace "Detected Bash project using pattern: $bash_pattern";
     fi
     
     type_count=${#found_types[@]};
@@ -85,7 +70,7 @@ detect_project_type() {
     case "$type_count" in
         0)
             error "No supported project types detected";
-            info "Supported: Rust (Cargo.toml), JS (package.json), Python (pyproject.toml/setup.py), Bash (version comments)";
+            info "Supported: Rust (Cargo.toml), JS (package.json), Python (pyproject.toml/setup.py), Bash (BashFX/scripts with version info)";
             return 1;
             ;;
         1)
@@ -106,6 +91,201 @@ detect_project_type() {
                 error "Use single language per project or configure .semvrc for multi-language sync";
                 return 1;
             fi
+            ;;
+    esac
+    
+    return "$ret";
+}
+
+################################################################################
+#
+#  detect_bash_project_pattern - Determine which bash project pattern is present
+#
+################################################################################
+# Returns: 0 on success (pattern found), 1 on failure (no pattern found)
+# Local Variables: folder_name, main_script
+# Stream Usage: Pattern name to stdout, messages to stderr
+
+detect_bash_project_pattern() {
+    local folder_name;
+    local main_script;
+    local ret=1;
+    
+    folder_name=$(basename "$(pwd)");
+    trace "Checking bash project patterns for folder: $folder_name";
+    
+    # Pattern 1: BashFX build.sh pattern (build.sh + parts/ + build.map)
+    if [[ -f "build.sh" && -d "parts" ]]; then
+        if [[ -f "parts/build.map" ]]; then
+            # Full BashFX pattern with build.map
+            local first_part;
+            first_part=$(grep -v "^#" "parts/build.map" | grep -v "^$" | head -n1 | sed 's/.*:[[:space:]]*//' 2>/dev/null);
+            if [[ -n "$first_part" && -f "parts/$first_part" ]]; then
+                local version_found="";
+                version_found=$(grep -E "^[[:space:]]*#[[:space:]]*(semv-version|version):" "parts/$first_part" 2>/dev/null);
+                if [[ -n "$version_found" ]]; then
+                    printf "bashfx-buildsh";
+                    trace "Found BashFX build.sh pattern with version in parts/$first_part";
+                    return 0;
+                fi
+            fi
+        else
+            # Has build.sh and parts/ but no build.map - still a build pattern
+            local numbered_parts;
+            numbered_parts=$(find parts -name "[0-9][0-9]_*.sh" -type f | sort | head -n1 2>/dev/null);
+            if [[ -n "$numbered_parts" ]]; then
+                local version_found="";
+                version_found=$(grep -E "^[[:space:]]*#[[:space:]]*(semv-version|version):" "$numbered_parts" 2>/dev/null);
+                if [[ -n "$version_found" ]]; then
+                    printf "bashfx-buildsh";
+                    trace "Found BashFX build.sh pattern (no build.map) with version in $numbered_parts";
+                    return 0;
+                fi
+            fi
+        fi
+    fi
+    
+    # Pattern 2: BashFX simple pattern (prefix-name/ folder + name.sh file)
+    if [[ "$folder_name" == *-* ]]; then
+        local suffix="${folder_name##*-}";
+        main_script="${suffix}.sh";
+        if [[ -f "$main_script" ]]; then
+            local version_found="";
+            version_found=$(grep -E "^[[:space:]]*#[[:space:]]*(semv-version|version):" "$main_script" 2>/dev/null);
+            if [[ -n "$version_found" ]]; then
+                printf "bashfx-simple";
+                trace "Found BashFX simple pattern: $folder_name -> $main_script with version";
+                return 0;
+            fi
+        fi
+    fi
+    
+    # Pattern 3: Standalone bash script (foldername.sh)
+    main_script="${folder_name}.sh";
+    if [[ -f "$main_script" ]]; then
+        local version_found="";
+        version_found=$(grep -E "^[[:space:]]*#[[:space:]]*(semv-version|version):" "$main_script" 2>/dev/null);
+        if [[ -n "$version_found" ]]; then
+            printf "bash-standalone";
+            trace "Found standalone bash pattern: $main_script with version";
+            return 0;
+        fi
+    fi
+    
+    # Pattern 4: Legacy semvrc configuration
+    if [[ -f ".semvrc" ]]; then
+        local bash_file;
+        bash_file=$(grep "^BASH_VERSION_FILE=" ".semvrc" 2>/dev/null | cut -d'=' -f2 | tr -d '"'"'");
+        if [[ -n "$bash_file" ]] && [[ -f "$bash_file" ]]; then
+            local version_found="";
+            version_found=$(grep -E "^[[:space:]]*#[[:space:]]*(semv-version|version):" "$bash_file" 2>/dev/null);
+            if [[ -n "$version_found" ]]; then
+                printf "bash-semvrc";
+                trace "Found semvrc pattern: $bash_file with version";
+                return 0;
+            fi
+        fi
+    fi
+    
+    # Pattern 5: Generic version-commented bash files
+    local bash_files;
+    mapfile -t bash_files < <(find . -maxdepth 2 -name "*.sh" -type f 2>/dev/null)
+    for file in "${bash_files[@]}"; do
+        local version_found="";
+        version_found=$(grep -E "^[[:space:]]*#[[:space:]]*(semv-version|version):" "$file" 2>/dev/null);
+        if [[ -n "$version_found" ]]; then
+            printf "bash-generic";
+            trace "Found generic bash pattern: $file with version";
+            return 0;
+        fi
+    done
+    
+    trace "No bash project pattern detected";
+    return 1;
+}
+
+################################################################################
+#
+#  get_bash_project_file - Get the main version file for detected bash pattern
+#
+################################################################################
+# Returns: 0 on success, 1 on failure
+# Local Variables: pattern, folder_name, main_script, first_part
+# Stream Usage: File path to stdout, messages to stderr
+
+get_bash_project_file() {
+    local pattern;
+    local folder_name;
+    local main_script;
+    local first_part;
+    local ret=1;
+    
+    pattern=$(detect_bash_project_pattern);
+    if [[ -z "$pattern" ]]; then
+        trace "No bash pattern detected, cannot determine project file";
+        return 1;
+    fi
+    
+    folder_name=$(basename "$(pwd)");
+    
+    case "$pattern" in
+        bashfx-buildsh)
+            # BashFX build.sh pattern - get first part file
+            if [[ -f "parts/build.map" ]]; then
+                first_part=$(grep -v "^#" "parts/build.map" | grep -v "^$" | head -n1 | sed 's/.*:[[:space:]]*//' 2>/dev/null);
+                if [[ -n "$first_part" && -f "parts/$first_part" ]]; then
+                    printf "parts/%s" "$first_part";
+                    ret=0;
+                fi
+            else
+                # No build.map, find first numbered part
+                first_part=$(find parts -name "[0-9][0-9]_*.sh" -type f | sort | head -n1 2>/dev/null);
+                if [[ -n "$first_part" ]]; then
+                    printf "%s" "$first_part";
+                    ret=0;
+                fi
+            fi
+            ;;
+        bashfx-simple)
+            # BashFX simple pattern - prefix-name/name.sh
+            local suffix="${folder_name##*-}";
+            main_script="${suffix}.sh";
+            if [[ -f "$main_script" ]]; then
+                printf "%s" "$main_script";
+                ret=0;
+            fi
+            ;;
+        bash-standalone)
+            # Standalone pattern - foldername.sh
+            main_script="${folder_name}.sh";
+            if [[ -f "$main_script" ]]; then
+                printf "%s" "$main_script";
+                ret=0;
+            fi
+            ;;
+        bash-semvrc)
+            # Legacy semvrc pattern
+            local bash_file;
+            bash_file=$(grep "^BASH_VERSION_FILE=" ".semvrc" 2>/dev/null | cut -d'=' -f2 | tr -d '"'"'");
+            if [[ -n "$bash_file" && -f "$bash_file" ]]; then
+                printf "%s" "$bash_file";
+                ret=0;
+            fi
+            ;;
+        bash-generic)
+            # Generic pattern - first file with version comment
+            local bash_files;
+            mapfile -t bash_files < <(find . -maxdepth 2 -name "*.sh" -type f 2>/dev/null)
+            for file in "${bash_files[@]}"; do
+                if grep -q -E "^[[:space:]]*#[[:space:]]*(semv-version|version):" "$file" 2>/dev/null; then
+                    printf "%s" "$file";
+                    ret=0;
+                    break;
+                fi
+            done
+            ;;
+        *)
+            trace "Unknown bash pattern: $pattern";
             ;;
     esac
     

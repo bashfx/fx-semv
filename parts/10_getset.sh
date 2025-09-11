@@ -58,21 +58,41 @@ do_get() {
             ;;
         bash|sh)
             if [[ -z "$file_path" ]]; then
-                # Try to detect bash file automatically
-                file_path=$(detect_bash_version_file);
+                # Try intelligent bash project detection
+                file_path=$(get_bash_project_file);
+                if [[ -z "$file_path" ]]; then
+                    # Fallback to legacy detection
+                    file_path=$(detect_bash_version_file);
+                fi
             fi
             
             if [[ -n "$file_path" ]] && [[ -f "$file_path" ]]; then
                 version=$(get_bash_version "$file_path");
                 if [[ -n "$version" ]]; then
-                    printf "bash (%s): %s\n" "$file_path" "$version";
+                    local pattern;
+                    pattern=$(detect_bash_project_pattern 2>/dev/null);
+                    if [[ -n "$pattern" ]]; then
+                        printf "bash (%s, pattern: %s): %s\n" "$file_path" "$pattern" "$version";
+                    else
+                        printf "bash (%s): %s\n" "$file_path" "$version";
+                    fi
                     ret=0;
                 else
                     error "No version comment found in: $file_path";
                 fi
             else
                 error "Bash file not specified or not found: ${file_path:-auto-detect failed}";
-                info "Usage: semv get bash ./my-script.sh";
+                local folder_name;
+                folder_name=$(basename "$(pwd)");
+                info "Auto-detection suggestions:";
+                if [[ -f "build.sh" && -d "parts" ]]; then
+                    info "  BashFX build.sh: Add version to first part file";
+                elif [[ "$folder_name" == *-* ]]; then
+                    local suffix="${folder_name##*-}";
+                    info "  BashFX simple: Add version to ${suffix}.sh";
+                else
+                    info "  Manual usage: semv get bash ./my-script.sh";
+                fi
             fi
             ;;
         all)
@@ -135,13 +155,28 @@ do_get_all() {
         found_any=1;
     fi
     
-    # Bash
+    # Bash - Enhanced with pattern detection
     local bash_file;
-    bash_file=$(detect_bash_version_file 2>/dev/null);
+    local bash_pattern;
+    
+    # Try intelligent detection first
+    bash_file=$(get_bash_project_file 2>/dev/null);
+    bash_pattern=$(detect_bash_project_pattern 2>/dev/null);
+    
+    # Fallback to legacy detection
+    if [[ -z "$bash_file" ]]; then
+        bash_file=$(detect_bash_version_file 2>/dev/null);
+        bash_pattern="legacy";
+    fi
+    
     if [[ -n "$bash_file" ]]; then
         version=$(get_bash_version "$bash_file" 2>/dev/null);
         if [[ -n "$version" ]]; then
-            output+="  bash (${bash_file}): ${version}\n"
+            if [[ -n "$bash_pattern" && "$bash_pattern" != "legacy" ]]; then
+                output+="  bash (${bash_file}, pattern: ${bash_pattern}): ${version}\n"
+            else
+                output+="  bash (${bash_file}): ${version}\n"
+            fi
             found_any=1;
         fi
     fi
@@ -173,11 +208,39 @@ do_get_all() {
         output+="  build number: ${build_number}\n"
     fi
     
-    # Project detection summary
+    # Project detection summary with enhanced bash pattern info
     output+="\n${bld}=== Project Type ===${x}\n"
     project_types=$(detect_project_type 2>/dev/null);
     if [[ -n "$project_types" ]]; then
         output+="  detected: ${project_types}\n"
+        
+        # If bash is detected, show the specific pattern
+        if [[ "$project_types" == *"bash"* ]]; then
+            local detected_bash_pattern;
+            detected_bash_pattern=$(detect_bash_project_pattern 2>/dev/null);
+            if [[ -n "$detected_bash_pattern" ]]; then
+                case "$detected_bash_pattern" in
+                    bashfx-buildsh)
+                        output+="  bash details: BashFX build.sh pattern (build.sh + parts/ + build.map)\n"
+                        ;;
+                    bashfx-simple)
+                        output+="  bash details: BashFX simple pattern (prefix-name/ + name.sh)\n"
+                        ;;
+                    bash-standalone)
+                        output+="  bash details: Standalone script (foldername.sh)\n"
+                        ;;
+                    bash-semvrc)
+                        output+="  bash details: Legacy semvrc configuration\n"
+                        ;;
+                    bash-generic)
+                        output+="  bash details: Generic version-commented script\n"
+                        ;;
+                    *)
+                        output+="  bash details: Pattern $detected_bash_pattern\n"
+                        ;;
+                esac
+            fi
+        fi
     else
         output+="  detected: none/unknown\n"
     fi
