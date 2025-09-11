@@ -35,12 +35,16 @@ print_version() {
         ver=$(printf '%s' "$line" | sed -E 's/^[^:]*:[[:space:]]*//; s/[[:space:]]+$//');
     fi
 
-    # Add explanatory note if requested
+    # Add explanatory note and professional header if requested
     if [[ "$show_note" -eq 0 ]]; then
-        printf "%s(This is the semv tool version, not your project version)%s\n" "$grey" "$x" >&2;
+        printf "%sLicense: Apache v2.0%s\n" "$grey2" "$x" >&2;
+        printf "%sSEMV v%s - the semantic versioning powertool%s\n"  "$grey" "${ver:-unknown}" "$x" >&2;
+        printf "%sCopyright (C) 2025, Qodeninja %s\n"  "$grey"  "$x" >&2;
+        printf "%s (BashFX Semv) \n" "${ver:-unknown}";
+    else
+        printf "semv %s\n" "${ver:-unknown}";
     fi
     
-    printf "semv %s\n" "${ver:-unknown}";
     return 0;
 }
 
