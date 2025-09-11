@@ -231,14 +231,14 @@ status_data() {
 
 ################################################################################
 #
-#  do_info - Show repository and version status
+#  do_dashboard - Show repository status dashboard
 #
 ################################################################################
 # Returns: 0 on success
 # Local Variables: user, branch, main_branch, project, build, remote_build, changes, since, days, semver, next
 # Stream Usage: Messages to stderr
 
-do_info() {
+do_dashboard() {
     local user;
     local branch;
     local main_branch;

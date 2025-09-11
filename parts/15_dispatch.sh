@@ -17,6 +17,7 @@ print_version() {
     local header;
     local line="";
     local ver="";
+    local show_note="${1:-1}";  # Show explanatory note by default
 
     # Only search near header to avoid matching code examples later
     if [[ -r "$file" ]]; then
@@ -34,8 +35,40 @@ print_version() {
         ver=$(printf '%s' "$line" | sed -E 's/^[^:]*:[[:space:]]*//; s/[[:space:]]+$//');
     fi
 
+    # Add explanatory note if requested
+    if [[ "$show_note" -eq 0 ]]; then
+        printf "%s(This is the semv tool version, not your project version)%s\n" "$grey" "$x" >&2;
+    fi
+    
     printf "semv %s\n" "${ver:-unknown}";
     return 0;
+}
+
+################################################################################
+#
+#  do_project_version - Show project version (what 'info' should do now)
+#
+################################################################################
+# Returns: Same as do_latest_semver
+# Stream Usage: Project version to stdout
+
+do_project_version() {
+    # This replaces what the 'version' command used to do
+    # Now 'info' shows project version, 'version' shows tool version
+    do_latest_semver "$@";
+}
+
+################################################################################
+#
+#  do_tool_version - Show semv tool version with explanatory note
+#
+################################################################################
+# Returns: 0 always
+# Stream Usage: Tool version to stdout, note to stderr
+
+do_tool_version() {
+    # Show tool version with explanatory note (for 'version' command)
+    print_version 0;  # 0 = show note
 }
 
 ################################################################################
@@ -59,18 +92,18 @@ dispatch() {
     if [[ $# -gt 0 ]]; then shift; fi # Remove command from args if present
     
     case "$cmd" in
-        # Version Operations
+        # Version Operations (NEW SEMANTICS)
         ""|latest|tag)     func_name="do_latest_semver";;
-        version|ver)       func_name="do_latest_semver";;
+        version|ver)       func_name="do_tool_version";;      # Now shows TOOL version
         next|dry)          func_name="do_next_semver";;
         bump)              func_name="do_bump";;
         
-        # Project Analysis  
-        info)              func_name="do_info";;
+        # Project Analysis (REORGANIZED)
+        info)              func_name="do_project_version";;   # Now shows PROJECT version  
         pend|pending)      func_name="do_pending";;
         chg|changes)       func_name="do_change_count";;
         since|last)        func_name="do_last";;
-        st|status)         func_name="do_info";;
+        st|status|stat)    func_name="do_dashboard";;          # Now shows dashboard
         gs)                func_name="do_status";;
         
         # Build Operations
@@ -282,7 +315,7 @@ main() {
     
     # Fast path: version flag
     if [[ "${opt_version:-1}" -eq 0 ]]; then
-        print_version;
+        print_version 0;  # 0 = show explanatory note
         return 0;
     fi
     

@@ -49,6 +49,13 @@ export TERM=xterm-256color;
 SEMV_BUILD_FILE="semv.build"
 BUILD_DIR="$PWD"
 
+# Enable boxy integration if available
+if command -v boxy >/dev/null 2>&1; then
+    SEMV_USE_BOXY="1"
+else
+    SEMV_USE_BOXY="0"
+fi
+
 ################################################################################
 #
 #  Semv Tool Version

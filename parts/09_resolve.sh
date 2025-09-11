@@ -399,10 +399,10 @@ __handle_package_stale() {
     
     if [[ "$opt_auto" -eq 0 ]]; then
         info "Auto-updating package file to $git_version";
-        __update_package_version "$git_version";
+        __update_package_version_with_details "$package_version" "$git_version";
     else
         if __confirm "Update package file to match git tag ($git_version)"; then
-            __update_package_version "$git_version";
+            __update_package_version_with_details "$package_version" "$git_version";
         else
             warn "Package file not updated - may cause further conflicts";
         fi
@@ -437,11 +437,15 @@ __create_sync_tag() {
     
     trace "Creating sync tag: $tag_name";
     
+    # Show what we're creating using boxy integration
+    local tag_info="Creating sync tag: ${tag_name}\nMessage: semv sync alignment";
+    view "info" "🏷️ Git Tag Creation" "$tag_info";
+    
     if git tag -a "$tag_name" -m "semv sync: align to package version $version" 2>/dev/null; then
-        okay "Created sync tag: $tag_name";
+        okay "✓ Created sync tag: $tag_name";
         return 0;
     else
-        error "Failed to create sync tag: $tag_name";
+        error "✗ Failed to create sync tag: $tag_name";
         return 1;
     fi
 }
@@ -574,6 +578,102 @@ __update_package_version() {
         esac
     else
         info "Please manually update package files to version: $new_version";
+    fi
+    
+    return 0;
+}
+
+################################################################################
+#
+#  __update_package_version_with_details - Enhanced version update with UX details
+#
+################################################################################
+# Arguments:
+#   1: old_version - Previous version for display
+#   2: new_version - New version to set
+# Returns: 0 on success, 1 on failure
+# Stream Usage: Detailed progress messages to stderr
+
+__update_package_version_with_details() {
+    local old_version="$1";
+    local new_version="$2";
+    local project_types;
+    local target_file="";
+    local update_type="";
+    
+    # Determine what we'll be updating
+    if project_types=$(detect_project_type); then
+        case "$project_types" in
+            rust)
+                target_file="Cargo.toml";
+                update_type="Rust package";
+                ;;
+            javascript)  
+                target_file="package.json";
+                update_type="JavaScript package";
+                ;;
+            python)
+                if [[ -f "pyproject.toml" ]]; then
+                    target_file="pyproject.toml";
+                else
+                    target_file="setup.py";
+                fi
+                update_type="Python package";
+                ;;
+            bash)
+                # Use intelligent pattern detection to get the exact file
+                target_file=$(get_bash_project_file);
+                if [[ -z "$target_file" ]]; then
+                    # Fallback to legacy detection
+                    target_file=$(detect_bash_version_file);
+                fi
+                local pattern;
+                pattern=$(detect_bash_project_pattern 2>/dev/null);
+                if [[ -n "$pattern" ]]; then
+                    case "$pattern" in
+                        bashfx-buildsh) update_type="BashFX build.sh project";;
+                        bashfx-simple) update_type="BashFX simple project";;
+                        bash-standalone) update_type="Bash standalone script";;
+                        bash-semvrc) update_type="Bash semvrc project";;
+                        *) update_type="Bash script";;
+                    esac
+                else
+                    update_type="Bash script";
+                fi
+                ;;
+            *)
+                info "Multi-language project detected: $project_types";
+                info "Please manually update package files to version: $new_version";
+                return 0;
+                ;;
+        esac
+    else
+        info "Please manually update package files to version: $new_version";
+        return 0;
+    fi
+    
+    # Show what we're about to do using boxy integration
+    if [[ -n "$target_file" ]]; then
+        local update_info="Type: ${update_type}\nFile: ${target_file}\nChange: ${old_version} → ${new_version}";
+        view "warning" "📝 Version Update" "$update_info";
+        
+        # Perform the update using existing functionality
+        case "$project_types" in
+            rust)
+                do_set rust "$new_version";;
+            javascript)  
+                do_set js "$new_version";;
+            python)
+                do_set python "$new_version";;
+            bash)
+                if [[ -n "$target_file" ]]; then
+                    do_set bash "$new_version" "$target_file";
+                fi
+                ;;
+        esac
+    else
+        warn "Could not determine target file for update";
+        return 1;
     fi
     
     return 0;
