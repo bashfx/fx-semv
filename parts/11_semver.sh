@@ -247,8 +247,9 @@ do_next_semver() {
 # Returns: 0 on success, 1 on failure
 # Local Variables: filename, dest, ret
 
+
 do_build_file() {
-    local filename="${1:-build.inf}";
+    local filename="${1:-$SEMV_BUILD_FILE}";
     local dest;
     local ret=1;
     
@@ -260,7 +261,7 @@ do_build_file() {
     
     # Determine destination path
     if [[ "$opt_build_dir" -eq 0 ]]; then
-        dest="$filename";
+        dest="./$filename"; #use local directory! fixed:@user
     else
         dest="$BUILD_DIR/$filename";
     fi
@@ -269,7 +270,7 @@ do_build_file() {
     if printf "%s\n" "$(date)" > "$dest"; then
         ret=0;
     fi
-    
+    j semv
     return "$ret";
 }
 

@@ -3566,7 +3566,7 @@ do_next_semver() {
 # Local Variables: filename, dest, ret
 
 do_build_file() {
-    local filename="${1:-build.inf}";
+    local filename="${1:-$SEMV_BUILD_FILE}";
     local dest;
     local ret=1;
     

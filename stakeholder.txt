@@ -1,0 +1,10 @@
+Tasks required by stakeholder "-" defect/regression "+" enhancement
+
+- STAKE-01 options flags not documented in help menu
+- STAKE-02 opt_build_dir does not accept directory argument!
+- STAKE-02a build file command should be changed from file -> build.
+- STAKE-02b build file command must work for all patterns
+( build file features in 04_options.sh and 11_semver.sh and 01_config.sh )
+- STAKE-03 syntax error line 4295/4297
+- STAKE-04 semv should not allow version bumps outside of main branch
++ STAKE-90 semv support information repos (document only no code)

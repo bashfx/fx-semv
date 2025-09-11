@@ -46,6 +46,9 @@ readonly SEMV_MIN_BUILD=1000;     # Minimum build number floor
 # Terminal setup
 export TERM=xterm-256color;
 
+SEMV_BUILD_FILE="semv.build"
+BUILD_DIR
+
 ################################################################################
 #
 #  Semv Tool Version
