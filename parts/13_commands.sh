@@ -31,6 +31,16 @@ do_bump() {
         return 1;
     fi
 
+    # Branch protection: only allow bumps on main/master branch
+    if ! is_main; then
+        local current_branch;
+        current_branch=$(this_branch);
+        error "Version bumps are only allowed on main/master branch";
+        error "Current branch: ${current_branch:-unknown}";
+        error "Switch to main branch and try again";
+        return 1;
+    fi
+
     # Ensure repository has a semv baseline for friendlier guidance
     if ! require_semv_baseline; then
         return 1;
@@ -943,11 +953,120 @@ do_days_ago() {
 # Returns: 0 on success, 1 on failure
 # Stream Usage: Messages to stderr
 
+################################################################################
+#
+#  _detect_bash_target_file - Smart bash project file detection
+#
+################################################################################
+# Returns: Nothing (outputs file path to stdout if found)
+# Local Variables: folder_name, main_script, parts_dir, build_map, first_part
+# Implements STAKE-05 logic for bash project structure detection
+
+_detect_bash_target_file() {
+    local folder_name;
+    local main_script;
+    local parts_dir="parts";
+    local build_map="parts/build.map";
+    local first_part="";
+    local zero_part="";
+    
+    folder_name=$(basename "$(pwd)");
+    
+    # Strategy 1: Check for parts/ directory structure (build.sh pattern)
+    if [[ -d "$parts_dir" ]]; then
+        trace "Found parts/ directory - checking for build.sh pattern";
+        
+        # Check for build.map file and get first entry
+        if [[ -f "$build_map" ]]; then
+            first_part=$(grep -v "^#" "$build_map" | grep -v "^$" | head -n1 | sed 's/.*:[[:space:]]*//' 2>/dev/null);
+            if [[ -n "$first_part" && -f "$parts_dir/$first_part" ]]; then
+                trace "Found first part from build.map: $parts_dir/$first_part";
+                printf "%s" "$parts_dir/$first_part";
+                return 0;
+            fi
+        fi
+        
+        # Look for 00_*.sh pattern in parts/
+        zero_part=$(find "$parts_dir" -name "00_*.sh" -type f | head -n1 2>/dev/null);
+        if [[ -n "$zero_part" ]]; then
+            trace "Found 00_ pattern file: $zero_part";
+            printf "%s" "$zero_part";
+            return 0;
+        fi
+        
+        # Fallback: look for any numbered part file
+        first_part=$(find "$parts_dir" -name "[0-9][0-9]_*.sh" -type f | sort | head -n1 2>/dev/null);
+        if [[ -n "$first_part" ]]; then
+            trace "Found numbered part file: $first_part";
+            printf "%s" "$first_part";
+            return 0;
+        fi
+    fi
+    
+    # Strategy 2: Look for main script matching folder pattern
+    # Example: in folder "prefix-name", look for "name.sh"
+    if [[ "$folder_name" == *-* ]]; then
+        local suffix="${folder_name##*-}";
+        main_script="${suffix}.sh";
+        if [[ -f "$main_script" ]]; then
+            trace "Found main script matching folder pattern: $main_script";
+            printf "%s" "$main_script";
+            return 0;
+        fi
+    fi
+    
+    # Strategy 3: Look for script matching full folder name
+    main_script="${folder_name}.sh";
+    if [[ -f "$main_script" ]]; then
+        trace "Found script matching folder name: $main_script";
+        printf "%s" "$main_script";
+        return 0;
+    fi
+    
+    # Strategy 4: Look for any .sh files with version info
+    local sh_files;
+    local file;
+    sh_files=$(find . -maxdepth 1 -name "*.sh" -type f 2>/dev/null);
+    for file in $sh_files; do
+        if grep -q "version.*:" "$file" 2>/dev/null; then
+            trace "Found .sh file with version info: $file";
+            printf "%s" "$file";
+            return 0;
+        fi
+    done
+    
+    # No suitable file found
+    trace "No suitable bash target file detected";
+    return 1;
+}
+
 do_sync() {
     # Optional: source file to compare/sync against
     local source_file="${1:-}";
+    local bash_target_file="";
 
     info "Starting version synchronization and conflict resolution...";
+
+    # Enhanced bash project support: auto-detect target file if not specified
+    if [[ -z "$source_file" ]]; then
+        bash_target_file=$(_detect_bash_target_file);
+        if [[ -n "$bash_target_file" ]]; then
+            info "Auto-detected bash target file: $bash_target_file";
+            source_file="$bash_target_file";
+        else
+            # Provide helpful guidance when auto-detection fails
+            warn "Could not auto-detect bash target file";
+            info "For bash projects with parts/ structure:";
+            info "  - Check that parts/ directory contains numbered files (e.g., 00_config.sh)";
+            info "  - Or ensure build.map exists with proper entries";
+            info "For standalone bash projects:";
+            info "  - Ensure script filename matches project folder pattern";
+            info "  - Or add version metadata to your .sh files";
+            info "Manual usage: semv sync <path-to-bash-file>";
+            error "Please specify the target file path explicitly";
+            return 1;
+        fi
+    fi
 
     if resolve_version_conflicts "$source_file"; then
         okay "Version synchronization completed successfully";

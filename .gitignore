@@ -1,0 +1,6 @@
+
+.eggs/
+.uat/
+.feats/
+docs/archive*
+semv.build

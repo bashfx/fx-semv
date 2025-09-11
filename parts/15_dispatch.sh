@@ -74,7 +74,7 @@ dispatch() {
         gs)                func_name="do_status";;
         
         # Build Operations
-        file)              func_name="do_build_file";;
+        build)             func_name="do_build_file";;
         bc|build-count)    func_name="do_build_count";;
         bcr|remote-build)  func_name="do_remote_build_count";;
         
@@ -191,7 +191,7 @@ ${bld}PROJECT ANALYSIS:${x}
     ${green}since${x}             Time since last commit
 
 ${bld}BUILD OPERATIONS:${x}
-    ${green}file${x}              Generate build info file
+    ${green}build${x}             Generate build info file
     ${green}bc${x}                Show current build count
 
 ${bld}REMOTE:${x}
@@ -229,9 +229,11 @@ ${bld}FLAGS:${x}
     ${yellow}-y, --yes${x}          Auto-answer yes to prompts
     ${yellow}-D, --dev${x}          Master dev flag (enables -d, -t)
     ${yellow}-N, --dev-note${x}     Add dev/build suffix to next version
+    ${yellow}-B, --build-dir${x}    Set build directory for output files
         --dry-run                Dry run mode (show what would happen)
         --view=MODE              View mode: data | simple | full
         --auto / --no-auto         Automation mode (silence prompts) / restore prompts
+        --no-cursor              Disable build cursor/info file generation
 
 ${bld}COMMIT LABELS:${x}
     ${orange}major|breaking|api:${x}  Major changes → Major bump

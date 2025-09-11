@@ -67,8 +67,19 @@ options() {
                 # Dry run mode - show what would happen without doing it
                 opt_dry_run=0;
                 ;;
+            --build-dir=*)
+                # Set build directory with = syntax
+                opt_build_dir="${this#*=}";
+                ;;
             --build-dir|-B)
-                opt_build_dir=0;
+                # Set build directory with next argument
+                if [[ -n "$next" ]] && [[ ! "$next" =~ ^- ]]; then
+                    opt_build_dir="$next";
+                    ((i++));
+                else
+                    error "Missing directory argument for --build-dir";
+                    ret=1;
+                fi
                 ;;
             --no-cursor)
                 opt_no_cursor=0;
@@ -120,11 +131,31 @@ options() {
 _filter_args() {
     local arg;
     local filtered_args=();
+    local skip_next=false;
     
     for arg in "$@"; do
+        if [[ "$skip_next" == true ]]; then
+            skip_next=false;
+            continue;
+        fi
+        
         case "$arg" in
+            --build-dir|-B)
+                # Skip this flag and the next argument (the directory path)
+                skip_next=true;
+                ;;
+            --build-dir=*)
+                # Skip this flag with embedded value
+                ;;
+            --view)
+                # Skip this flag and the next argument (the view mode)
+                skip_next=true;
+                ;;
+            --view=*)
+                # Skip this flag with embedded value
+                ;;
             -*)
-                # Skip flags
+                # Skip other flags
                 ;;
             *)
                 filtered_args+=("$arg");

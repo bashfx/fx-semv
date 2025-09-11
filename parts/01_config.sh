@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # semv-config.sh - Configuration and Constants
-# semv-version: 2.1.2
+# semv-version: 2.1.3
 # 
 # BashFX compliant configuration module
 #
@@ -75,7 +75,7 @@ opt_dev=0;         # 0=enabled, 1=disabled (default off=1)
 
 # SEMV-specific option states
 opt_dev_note=1;    # 0=enabled, 1=disabled (default off=1)
-opt_build_dir=1;   # 0=enabled, 1=disabled (default off=1)
+opt_build_dir="";   # Directory path for build output (empty = use current dir)
 opt_no_cursor=1;   # 0=enabled, 1=disabled (default off=1)
 opt_auto=0;        # 0=enabled (auto-mode default on to avoid prompts), 1=disabled
 opt_help=1;        # 0=show help and exit, 1=normal
