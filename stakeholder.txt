@@ -11,4 +11,13 @@ Tasks required by stakeholder "-" defect/regression "+" enhancement
 
 - STAKE-03 syntax error line 4295/4297
 - STAKE-04 semv should not allow version bumps outside of main branch
+
+- STAKE-05 (BUILD PARTS SUPPORT) semv sync command for bash is really dumb, it needs to support
+  checking in part files, or looking for the main script file that matches the
+  name of the folder for example we are in folder prefix-name, and there is a file called
+  name.sh, this is probably the main script file, unless there is a parts/ folder,
+  then the 00_*.sh folder probably has version info (it can also be the FIRST file in build.map but the number may be different).
+  If no bash files have version info the main 00_ part file is the most likely place to 
+  add it, otherwise error and tell the user to pass the path to the file that needs version syncing.
+
 + STAKE-90 semv support information repos (document only no code)
