@@ -1036,7 +1036,55 @@ do_sync() {
         fi
     fi
 
+    # Capture versions before sync for reporting
+    local old_package_version="";
+    local old_git_version="";
+    local old_semv_version="";
+    
+    if [[ -n "$source_file" && -f "$source_file" ]]; then
+        old_package_version=$(__extract_version_from_file "$source_file");
+    fi
+    old_git_version=$(_latest_tag);
+    old_semv_version=$(_calculate_semv_version);
+    
+    trace "Pre-sync state: package=$old_package_version, git=$old_git_version, calculated=$old_semv_version";
+    
     if resolve_version_conflicts "$source_file"; then
+        # Capture versions after sync for reporting  
+        local new_package_version="";
+        local new_git_version="";
+        local new_semv_version="";
+        
+        if [[ -n "$source_file" && -f "$source_file" ]]; then
+            new_package_version=$(__extract_version_from_file "$source_file");
+        fi
+        new_git_version=$(_latest_tag);
+        new_semv_version=$(_calculate_semv_version);
+        
+        # Show what actually changed
+        local sync_summary="";
+        local changes_made=0;
+        
+        if [[ "$old_package_version" != "$new_package_version" && -n "$new_package_version" ]]; then
+            sync_summary+="📝 Package: ${old_package_version:-none} → ${new_package_version}\n";
+            sync_summary+="   File: ${source_file}\n";
+            changes_made=1;
+        fi
+        
+        if [[ "$old_git_version" != "$new_git_version" && -n "$new_git_version" ]]; then
+            sync_summary+="🏷️ Git Tag: ${old_git_version:-none} → ${new_git_version}\n";
+            changes_made=1;
+        fi
+        
+        if [[ "$old_semv_version" != "$new_semv_version" && -n "$new_semv_version" ]]; then
+            sync_summary+="🎯 Next Version: ${old_semv_version:-none} → ${new_semv_version}\n";
+        fi
+        
+        # Display summary if changes were made
+        if [[ "$changes_made" -eq 1 && -n "$sync_summary" ]]; then
+            view "success" "🔄 Sync Summary" "$sync_summary";
+        fi
+        
         okay "Version synchronization completed successfully";
         return 0;
     else
