@@ -313,7 +313,6 @@ do_dashboard() {
         # latest_tag and release_desc already populated via status_data
 
         # Build info message (emoji + 4-letter codes); colorize bracketed data fields
-        msg+="~~ Repository Status ~~\n";
         msg+="👷 USER: [${grey}${user}${x}]\n";
         msg+="📦 REPO: [${grey}${project}${x}] [${grey}${branch}${x}] [${grey}${main_branch}${x}]\n";
         # Changes: color whole bracket (green when >0, grey when 0)
@@ -365,20 +364,18 @@ do_dashboard() {
             msg+="🔎 VERS: [${red}-unset-${x}]\n";
         fi
         
-        # Enhanced: Pending Issues Section
-        local pending_issues="";
-        local has_pending=0;
+        # Enhanced: Pending Issues for Status Area
+        local pending_status="";
+        local pending_items=();
         
         # Check for uncommitted changes
         if [[ "$changes_num" -gt 0 ]]; then
-            pending_issues+="📝 ${green}${changes_num} changes pending commit${x}\n";
-            has_pending=1;
+            pending_items+=("${yellow}+ ${changes_num} changes pending commit${x}");
         fi
         
         # Check if version needs bump (calculated version ahead of current)
         if [[ -n "$next_raw" && -n "$semver" ]] && do_is_greater "$next_raw" "$semver"; then
-            pending_issues+="🚀 ${orange}version needs bump${x} (${semver} -> ${next_raw})\n";
-            has_pending=1;
+            pending_items+=("${yellow}+ version needs bump (${semver} -> ${next_raw})${x}");
         fi
         
         # Check if version needs sync (package vs git tag mismatch)
@@ -399,20 +396,23 @@ do_dashboard() {
             if [[ -n "$package_version" && -n "$latest_tag" ]]; then
                 local git_version_clean="${latest_tag#v}";
                 if [[ "$package_version" != "$git_version_clean" ]]; then
-                    pending_issues+="🔄 ${red}version needs sync${x} (package: ${package_version}, git: ${latest_tag})\n";
-                    has_pending=1;
+                    pending_items+=("${yellow}+ version needs sync (package: ${package_version}, git: ${latest_tag})${x}");
                 fi
             fi
         fi
         
-        # Add pending issues section if any found
-        if [[ "$has_pending" -eq 1 ]]; then
-            msg+="\n${bld}=== Pending Actions ===${x}\n";
-            msg+="$pending_issues";
+        # Add pending issues section to main content if any found
+        if [[ ${#pending_items[@]} -gt 0 ]]; then
+            msg+="\n─── Pending Actions ───\n";
+            # Add each pending item on its own line
+            local item;
+            for item in "${pending_items[@]}"; do
+                msg+="${item}\n";
+            done
         fi
         
-        # Render via view layer (boxy if available), support --view=data passthrough
-        view_status "$msg";
+        # Render via enhanced dashboard view
+        view_dashboard "$msg";
     else
         warn "Repository: [${user}] [${project}] [${branch}] [${red}no commits${x}]";
     fi
@@ -858,6 +858,7 @@ do_label_help() {
 do_auto() {
     local action="${1:-sync}";
     shift || true;
+    local ret=0;
     
     trace "Auto mode: $action";
     
@@ -865,20 +866,46 @@ do_auto() {
         sync)
             info "Auto-sync: Running version synchronization";
             do_sync "$@";
+            ret=$?;
+            if [[ $ret -eq 0 ]]; then
+                trace "Auto-sync completed successfully";
+            else
+                warn "Auto-sync completed with issues";
+            fi
             ;;
         validate)
             info "Auto-validate: Running version validation";
             do_validate "$@";
+            ret=$?;
+            if [[ $ret -eq 0 ]]; then
+                trace "Auto-validate completed successfully";
+            else
+                warn "Auto-validate found issues";
+            fi
             ;;
         drift)
             info "Auto-drift: Running drift analysis";
             do_drift "$@";
+            ret=$?;
+            if [[ $ret -eq 0 ]]; then
+                trace "Auto-drift completed successfully";
+            else
+                warn "Auto-drift found issues";
+            fi
             ;;
         *)
             info "Auto mode (default): Running sync";
             do_sync "$action" "$@";
+            ret=$?;
+            if [[ $ret -eq 0 ]]; then
+                trace "Auto-sync completed successfully";
+            else
+                warn "Auto-sync completed with issues";
+            fi
             ;;
     esac
+    
+    return $ret;
 }
 
 ################################################################################

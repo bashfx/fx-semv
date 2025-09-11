@@ -288,7 +288,7 @@ _analyze_version_drift() {
             __handle_package_stale "$package_version" "$git_version";
             ;;
         semv_calculated_ahead)
-            info "Semv calculated version ahead - proceeding with bump";
+            __handle_semv_calculated_ahead "$source_file" "$semv_version";
             ;;
         versions_aligned)
             info "All version sources aligned - proceeding normally";
@@ -380,6 +380,40 @@ __handle_semv_happy() {
 
 ################################################################################
 #
+#  __handle_semv_calculated_ahead - Calculated version ahead of package/git
+#
+################################################################################
+# Arguments:
+#   1: source_file - Package file to update
+#   2: semv_version - Calculated semv version to sync to
+# Returns: 0 on success, 1 on failure
+
+__handle_semv_calculated_ahead() {
+    local source_file="$1";
+    local semv_version="$2";
+    
+    info "Semv calculated version ahead - proceeding with bump";
+    info "  Target version: $semv_version";
+    
+    # Update package version to match calculated semv
+    if [[ -n "$source_file" && -f "$source_file" ]]; then
+        if ! __update_package_version_with_details "$source_file" "$semv_version"; then
+            error "Failed to update package version";
+            return 1;
+        fi
+    fi
+    
+    # Create git tag for the new version
+    if ! __create_sync_tag "$semv_version"; then
+        error "Failed to create sync tag";
+        return 1;
+    fi
+    
+    return 0;
+}
+
+################################################################################
+#
 #  __handle_package_stale - Package version lower than git tags
 #
 ################################################################################
@@ -428,7 +462,14 @@ __handle_package_stale() {
 
 __create_sync_tag() {
     local version="$1";
-    local tag_name="v${version}";
+    local tag_name;
+    
+    # Ensure single 'v' prefix (handle both v1.2.3 and 1.2.3 inputs)
+    if [[ "$version" =~ ^v ]]; then
+        tag_name="$version";
+    else
+        tag_name="v${version}";
+    fi
     
     if ! _is_git_repo; then
         error "Not in git repository - cannot create sync tag";

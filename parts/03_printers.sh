@@ -80,6 +80,24 @@ view_status() {
     view info "Repository Status" "$content"
 }
 
+# view_dashboard - Enhanced dashboard renderer with visual dividers
+# Arguments:
+#   1: content
+#   2: status_text (optional) - Text for the status line
+# Uses theme=info, title with icon, and layout dividers for sections
+view_dashboard() {
+    local content="$1"
+    local status_text="${2:-}"
+    
+    if [[ -n "$status_text" ]]; then
+        # Use boxy status area with left alignment for pending actions
+        view info "📊 Repository Status" "$content" --layout dtn --status "sl:$status_text"
+    else
+        # Standard dashboard without status
+        view info "📊 Repository Status" "$content" --layout dtn
+    fi
+}
+
 ################################################################################
 #
 #  Drift View Orchestrator
