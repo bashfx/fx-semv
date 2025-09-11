@@ -360,9 +360,55 @@ do_dashboard() {
             else
                 next_disp="${orange}${next_raw}${x}" # fallback
             fi
-            msg+="🔎 VERS: [${grey}${semver}${x} -> ${next_disp}]";
+            msg+="🔎 VERS: [${grey}${semver}${x} -> ${next_disp}]\n";
         else
-            msg+="🔎 VERS: [${red}-unset-${x}]";
+            msg+="🔎 VERS: [${red}-unset-${x}]\n";
+        fi
+        
+        # Enhanced: Pending Issues Section
+        local pending_issues="";
+        local has_pending=0;
+        
+        # Check for uncommitted changes
+        if [[ "$changes_num" -gt 0 ]]; then
+            pending_issues+="📝 ${green}${changes_num} changes pending commit${x}\n";
+            has_pending=1;
+        fi
+        
+        # Check if version needs bump (calculated version ahead of current)
+        if [[ -n "$next_raw" && -n "$semver" ]] && do_is_greater "$next_raw" "$semver"; then
+            pending_issues+="🚀 ${orange}version needs bump${x} (${semver} -> ${next_raw})\n";
+            has_pending=1;
+        fi
+        
+        # Check if version needs sync (package vs git tag mismatch)
+        local package_version="";
+        if [[ -n "$(detect_project_type 2>/dev/null)" ]]; then
+            local project_types;
+            project_types=$(detect_project_type 2>/dev/null);
+            if [[ "$project_types" == *"bash"* ]]; then
+                local bash_file;
+                bash_file=$(get_bash_project_file 2>/dev/null);
+                if [[ -n "$bash_file" && -f "$bash_file" ]]; then
+                    package_version=$(__extract_version_from_file "$bash_file" 2>/dev/null);
+                fi
+            else
+                package_version=$(_get_package_version "$project_types" 2>/dev/null);
+            fi
+            
+            if [[ -n "$package_version" && -n "$latest_tag" ]]; then
+                local git_version_clean="${latest_tag#v}";
+                if [[ "$package_version" != "$git_version_clean" ]]; then
+                    pending_issues+="🔄 ${red}version needs sync${x} (package: ${package_version}, git: ${latest_tag})\n";
+                    has_pending=1;
+                fi
+            fi
+        fi
+        
+        # Add pending issues section if any found
+        if [[ "$has_pending" -eq 1 ]]; then
+            msg+="\n${bld}=== Pending Actions ===${x}\n";
+            msg+="$pending_issues";
         fi
         
         # Render via view layer (boxy if available), support --view=data passthrough
