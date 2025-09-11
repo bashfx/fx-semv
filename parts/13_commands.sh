@@ -1074,6 +1074,23 @@ do_sync() {
             else
                 warn "Bash project detected but no version file found";
             fi
+        elif [[ "$project_types" == *"rust"* && -f "Cargo.toml" ]]; then
+            # Rust project detected
+            info "Auto-detected Rust project: Cargo.toml";
+            source_file="Cargo.toml";
+        elif [[ "$project_types" == *"javascript"* && -f "package.json" ]]; then
+            # JavaScript project detected
+            info "Auto-detected JavaScript project: package.json";
+            source_file="package.json";
+        elif [[ "$project_types" == *"python"* ]]; then
+            # Python project detected - prefer pyproject.toml over setup.py
+            if [[ -f "pyproject.toml" ]]; then
+                info "Auto-detected Python project: pyproject.toml";
+                source_file="pyproject.toml";
+            elif [[ -f "setup.py" ]]; then
+                info "Auto-detected Python project: setup.py";
+                source_file="setup.py";
+            fi
         fi
         
         # If we still don't have a source file, provide intelligent guidance
