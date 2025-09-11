@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # semv-config.sh - Configuration and Constants
-# semv-version: 2.4.0
+# semv-version: 2.4.1
 # 
 # BashFX compliant configuration module
 #
