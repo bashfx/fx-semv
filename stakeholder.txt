@@ -14,11 +14,3 @@ Tasks required by stakeholder "-" defect/regression "+" enhancement
 + STAKE-90 semv support information repos (document only no code)
 
 
-ERROR when running semv info
-
-semv info
-/home/xnull/.local/bin/semv: line 4301: [[: 1064: syntax error: operand expected (error token is "1064")
-/home/xnull/.local/bin/semv: line 4303: [[: 1064: syntax error: operand expected (error token is "1064")
-
-
-

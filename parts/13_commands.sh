@@ -306,14 +306,9 @@ do_info() {
             changes="${grey}0${x} file(s)";
         fi
         
-        # Format build comparison
-        if [[ "$remote_build" -gt "$build" ]]; then
-            remote_build="${green}${remote_build}${x}";  # remote ahead
-        elif [[ "$remote_build" -eq "$build" ]]; then
-            :; # equal
-        else
-            build="${green}${build}${x}";                # local ahead
-        fi
+        # Keep numeric values for comparisons, create separate display variables
+        local build_num="${build}";
+        local remote_build_num="${remote_build}";
         
         # latest_tag and release_desc already populated via status_data
 
@@ -328,14 +323,14 @@ do_info() {
         msg+="✏️ CHNG: [${chng_color}${chng_disp}${x}]\n";
         # Build: color numbers by relation, keep bracket context orange
         local col_local col_remote
-        if [[ "$build" -gt "$remote_build" ]]; then
+        if [[ "$build_num" -gt "$remote_build_num" ]]; then
             col_local="$green"; col_remote="$red";
-        elif [[ "$build" -lt "$remote_build" ]]; then
+        elif [[ "$build_num" -lt "$remote_build_num" ]]; then
             col_local="$red"; col_remote="$green";
         else
             col_local="$blue"; col_remote="$blue";
         fi
-        msg+="🔧 BULD: [${grey}local=${col_local}${build}${x}${grey} remote=${col_remote}${remote_build}${x}]\n";
+        msg+="🔧 BULD: [${grey}local=${col_local}${build_num}${x}${grey} remote=${col_remote}${remote_build_num}${x}]\n";
         # Last: color whole bracket in orange for readability; pretty string follows as-is
         msg+="⏱️ LAST: [${grey}${days} days${x}] ${since}\n";
         # Tags on one line: last [ ] release [ ] with colored contents
