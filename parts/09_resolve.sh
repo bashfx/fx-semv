@@ -557,7 +557,12 @@ __update_package_version() {
                 do_set python "$new_version";;
             bash)
                 local bash_file;
-                bash_file=$(detect_bash_version_file);
+                # Use intelligent pattern detection first
+                bash_file=$(get_bash_project_file);
+                if [[ -z "$bash_file" ]]; then
+                    # Fallback to legacy detection
+                    bash_file=$(detect_bash_version_file);
+                fi
                 if [[ -n "$bash_file" ]]; then
                     do_set bash "$new_version" "$bash_file";
                 fi

@@ -447,7 +447,12 @@ do_set() {
             ;;
         bash|sh)
             if [[ -z "$file_path" ]]; then
-                file_path=$(detect_bash_version_file);
+                # Use intelligent pattern detection first
+                file_path=$(get_bash_project_file);
+                if [[ -z "$file_path" ]]; then
+                    # Fallback to legacy detection
+                    file_path=$(detect_bash_version_file);
+                fi
             fi
             
             if [[ -n "$file_path" ]] && [[ -f "$file_path" ]]; then

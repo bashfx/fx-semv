@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-# semv-version: 2.1.3
+# semv-version: 2.2.0
 
 # Load test libs
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
