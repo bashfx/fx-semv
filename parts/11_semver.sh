@@ -267,6 +267,8 @@ do_build_file() {
     fi
     
     # Write build cursor file
+		#TODO: This is NOT ENOUGH! it must have all the build info
+		#same screen as 'semv info' just in key=value line format
     if printf "%s\n" "$(date)" > "$dest"; then
         ret=0;
     fi
