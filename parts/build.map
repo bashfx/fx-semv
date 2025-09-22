@@ -3,7 +3,7 @@
 # Lines starting with # are ignored
 # Place this file in: parts/build.map
 
-01 : 01_config.sh
+01 : 01_header.sh
 02 : 02_colors.sh
 03 : 03_printers.sh
 04 : 04_options.sh
