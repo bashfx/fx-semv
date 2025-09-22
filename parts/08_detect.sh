@@ -24,6 +24,7 @@ detect_project_type() {
     local -a found_types=();
     local type_count;
     local bash_pattern="";
+    local manifest_detected=0;
     
     trace "Detecting project type...";
     
@@ -32,6 +33,7 @@ detect_project_type() {
         if grep -q "^\[package\]" "Cargo.toml" 2>/dev/null; then
             found_types+=("rust");
             trace "Detected Rust project (Cargo.toml with [package])";
+            manifest_detected=1;
         fi
     fi
     
@@ -40,6 +42,7 @@ detect_project_type() {
         if grep -q '"version"' "package.json" 2>/dev/null; then
             found_types+=("javascript");
             trace "Detected JavaScript project (package.json with version)";
+            manifest_detected=1;
         fi
     fi
     
@@ -48,19 +51,25 @@ detect_project_type() {
         if grep -q "^\[project\]" "pyproject.toml" 2>/dev/null; then
             found_types+=("python");
             trace "Detected Python project (pyproject.toml with [project])";
+            manifest_detected=1;
         fi
     elif [[ -f "setup.py" ]]; then
         if grep -q "version=" "setup.py" 2>/dev/null; then
             found_types+=("python");
             trace "Detected Python project (setup.py with version)";
+            manifest_detected=1;
         fi
     fi
-    
+
     # Enhanced Bash project detection with pattern identification
-    bash_pattern=$(detect_bash_project_pattern);
-    if [[ -n "$bash_pattern" ]]; then
-        found_types+=("bash");
-        trace "Detected Bash project using pattern: $bash_pattern";
+    if [[ "$manifest_detected" -eq 0 ]]; then
+        bash_pattern=$(detect_bash_project_pattern);
+        if [[ -n "$bash_pattern" ]]; then
+            found_types+=("bash");
+            trace "Detected Bash project using pattern: $bash_pattern";
+        fi
+    else
+        trace "Skipping bash detection due to manifest-based project discovery";
     fi
     
     type_count=${#found_types[@]};
@@ -121,6 +130,7 @@ detect_bash_project_pattern() {
             local first_part;
             first_part=$(grep -v "^#" "parts/build.map" | grep -v "^$" | head -n1 | sed 's/.*:[[:space:]]*//' 2>/dev/null);
             if [[ -n "$first_part" && -f "parts/$first_part" ]]; then
+                trace "Found first part from build.map: parts/$first_part";
                 local version_found="";
                 version_found=$(grep -E "^[[:space:]]*#[[:space:]]*(semv-version|version):" "parts/$first_part" 2>/dev/null);
                 if [[ -n "$version_found" ]]; then
