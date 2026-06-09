@@ -1,0 +1,41 @@
+[repo]
+uid = "repo_a98e71aca2fec01c5a30"
+id = "bashfx/fx-semv"
+name = "fx-semv"
+kind = "tool"
+lifecycle = "active"
+
+[[capabilities]]
+name = "version.resolve"
+module = "parts/09_resolve.sh"
+class = "tool"
+tags = ["semver", "highest-wins", "drift", "package-version", "git-tag"]
+stability = "working"
+
+[[capabilities]]
+name = "version.validate"
+module = "parts/09_resolve.sh"
+class = "tool"
+tags = ["version-drift", "multi-language", "sync-check", "semver"]
+stability = "working"
+
+[[capabilities]]
+name = "version.sync"
+module = "parts/10_getset.sh"
+class = "tool"
+tags = ["cargo", "package-json", "pyproject", "bash", "set-all"]
+stability = "working"
+
+[[capabilities]]
+name = "repo.sync"
+module = "parts/13_commands.sh"
+class = "tool"
+tags = ["git-tag", "bump", "retag", "release", "remote"]
+stability = "working"
+
+[[capabilities]]
+name = "process.manage"
+module = "parts/12_lifecycle.sh"
+class = "adapter"
+tags = ["install", "xdg", "config", "bashfx"]
+stability = "working"
